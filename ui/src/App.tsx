@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle, ArrowLeft, Camera, Check, CircleOff, Cloud,
   CloudOff, Flame, Image, Play, Square, Thermometer, WifiOff,
@@ -14,6 +14,15 @@ const LABELS = {
   fault: "Défaut",
   off: "Indisponible",
 } as const;
+
+// L'état LED dépend aussi du préchauffage. Une caméra raccordée reste
+// consultable même si la température est inférieure à 35 °C.
+function cameraLabel(cam: CameraStatus): string {
+  if (!cam.configured) return "Non configurée";
+  if (!cam.connected) return "Déconnectée";
+  if (cam.led === "off") return "Connectée";
+  return LABELS[cam.led];
+}
 
 function formatTemp(value: number | null): string {
   return value === null ? "—" : value.toLocaleString("fr-FR", {
@@ -36,12 +45,12 @@ function CameraTile({
     <button
       className={"camera-tile " + camera.led + (selected ? " selected" : "")}
       onClick={onClick}
-      aria-label={"Caméra " + camera.slot + " : " + LABELS[camera.led]}
+      aria-label={"Caméra " + camera.slot + " : " + cameraLabel(camera)}
       type="button"
     >
       <span className="camera-tile-icon"><Camera size={20} /></span>
       <span className="camera-tile-label">CAM {camera.slot}</span>
-      <span className="camera-tile-state"><i />{LABELS[camera.led]}</span>
+      <span className="camera-tile-state"><i />{cameraLabel(camera)}</span>
     </button>
   );
 }
@@ -66,6 +75,17 @@ export default function App() {
   const [bootVisible, setBootVisible] = useState(true);
   const [frameTime, setFrameTime] = useState(Date.now());
   const [frameError, setFrameError] = useState(false);
+  const [frameLoading, setFrameLoading] = useState(false);
+  const frameTimer = useRef<number | null>(null);
+
+  function scheduleNextFrame(delayMs: number) {
+    if (frameTimer.current !== null) window.clearTimeout(frameTimer.current);
+    frameTimer.current = window.setTimeout(() => {
+      frameTimer.current = null;
+      setFrameLoading(true);
+      setFrameTime(Date.now());
+    }, delayMs);
+  }
 
   async function refresh() {
     try {
@@ -84,10 +104,18 @@ export default function App() {
     return () => { clearInterval(timer); clearTimeout(boot); };
   }, []);
   useEffect(() => {
-    if (screen !== "camera") return;
-    setFrameError(false);
-    const timer = window.setInterval(() => setFrameTime(Date.now()), 3000);
-    return () => clearInterval(timer);
+    if (frameTimer.current !== null) {
+      window.clearTimeout(frameTimer.current);
+      frameTimer.current = null;
+    }
+    if (screen === "camera") {
+      setFrameError(false);
+      setFrameLoading(true);
+      setFrameTime(Date.now());
+    }
+    return () => {
+      if (frameTimer.current !== null) window.clearTimeout(frameTimer.current);
+    };
   }, [screen, camera]);
   useEffect(() => {
     if (!notice) return;
@@ -285,15 +313,31 @@ export default function App() {
                 <div className="preview-frame">
                   {selected?.connected ? (
                     <img src={previewUrl(camera, frameTime)} alt={"Image de la caméra " + camera}
-                      onLoad={() => setFrameError(false)} onError={() => setFrameError(true)} />
+                      onLoad={() => {
+                        setFrameError(false);
+                        setFrameLoading(false);
+                        scheduleNextFrame(1500);
+                      }}
+                      onError={() => {
+                        setFrameError(true);
+                        setFrameLoading(false);
+                        scheduleNextFrame(4500);
+                      }} />
                   ) : <div className="empty-preview"><CircleOff size={36} /> Caméra absente</div>}
-                  {frameError && <div className="preview-error">Image indisponible · vérifier le périphérique USB</div>}
+                  {frameError && <div className="preview-error">Aperçu momentanément indisponible · nouvel essai automatique</div>}
                 </div>
                 <aside className="camera-info">
                   <strong>CAM {camera}</strong>
-                  <span className={"state-mark " + selected?.led}>{selected ? LABELS[selected.led] : "—"}</span>
-                  <p>Aperçu ponctuel, actualisé toutes les 3 secondes.</p>
-                  <button className="action" onClick={() => { setFrameTime(Date.now()); setFrameError(false); }}>Actualiser</button>
+                  <span className={"state-mark " + selected?.led}>{selected ? cameraLabel(selected) : "—"}</span>
+                  <p>Aperçu actualisé après réception de la précédente image. Les acquisitions des tests restent prioritaires.</p>
+                  <button className="action" disabled={!selected?.connected || frameLoading}
+                    onClick={() => {
+                      if (frameTimer.current !== null) window.clearTimeout(frameTimer.current);
+                      frameTimer.current = null;
+                      setFrameLoading(true);
+                      setFrameTime(Date.now());
+                      setFrameError(false);
+                    }}>Actualiser</button>
                   {selected?.led === "fault" && selected.connected
                     && !selected.active_test && !status?.thermal.fault &&
                     <button className="action" disabled={working}

@@ -45,3 +45,9 @@ de la copie source ou des anciennes données n'est nécessaire.
 L'installation du service et du kiosque dans l'OS reste distincte de
 la simple présence de ces gabarits dans Git. Documenter l'état réellement
 atteint et ne pas annoncer un redémarrage testé sans l'avoir effectué.
+
+## Reboot de validation 23/10/2026
+
+Le reboot contrôlé a été effectué : `dama-lite-staging.service` est redevenu **actif et enabled**, Chromium a été lancé automatiquement en mode `--kiosk` vers `http://127.0.0.1:8765`, et le backend a servi la page React et les ressources CSS/JS avec HTTP 200. GPIO12 et GPIO21 sont restés en entrée (aucun pilotage LED/chauffage). Une capture DSI a confirmé un affichage 800×480 réel.
+
+L'essai de prévisualisation via le navigateur a montré que le remplacement forcé du JPEG toutes les 3 secondes provoquait des annulations HTTP si la webcam mettait plus de temps à répondre. Le composant React attend maintenant la fin du chargement (ou l'échec) avant de demander une autre image, avec délai de reprise ; le backend ignore les BrokenPipe dus aux clients déconnectés et limite les logs de statut.

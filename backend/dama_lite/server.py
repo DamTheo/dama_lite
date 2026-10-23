@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+from .cameras import CameraError
 from .config import Config
 from .interlocks import ensure_gpio_exclusive
 from .service import DamaLiteService
@@ -34,8 +35,13 @@ def make_handler(service: DamaLiteService):
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
             self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'")
-            self.end_headers()
-            self.wfile.write(data)
+            try:
+                self.end_headers()
+                self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError):
+                # Une ancienne requête d'aperçu a été annulée par le navigateur.
+                # Ne jamais envoyer un second HTTP 503 après avoir écrit le 200.
+                LOG.debug("Client HTTP déconnecté avant fin de transmission.")
 
         def _json(self, code: int, payload: dict) -> None:
             self._send(
@@ -84,6 +90,9 @@ def make_handler(service: DamaLiteService):
                     return
                 mime = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
                 self._send(200, target.read_bytes(), mime)
+            except CameraError as exc:
+                LOG.warning("Aperçu non disponible (%s) : %s", path, exc)
+                self._error(503, str(exc))
             except Exception as exc:
                 LOG.exception("GET %s : %s", path, exc)
                 self._error(503, str(exc))
@@ -148,6 +157,10 @@ def make_handler(service: DamaLiteService):
                 self._error(500, "Erreur interne : consulter les journaux du Pi.")
 
         def log_message(self, fmt: str, *args) -> None:
+            # React interroge l'état chaque seconde ; éviter plusieurs
+            # millions d'entrées de journal et l'usure inutile de la carte SD.
+            if self.path.startswith("/api/status") or self.path.startswith("/api/health"):
+                return
             LOG.info("%s - %s", self.address_string(), fmt % args)
 
     return Handler
