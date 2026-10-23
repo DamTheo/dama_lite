@@ -3,7 +3,7 @@ import {
   AlertTriangle, ArrowLeft, Camera, Check, CircleOff, Cloud,
   CloudOff, Flame, Image, Play, Square, Thermometer, WifiOff,
 } from "lucide-react";
-import { acknowledgeCamera, getStatus, previewUrl, startTest, stopTest } from "./api";
+import { acknowledgeCamera, getStatus, streamUrl, startTest, stopTest } from "./api";
 import { Face, PowerOverlay } from "./Face";
 import TouchKeyboard from "./TouchKeyboard";
 import type { CameraStatus, MachineStatus, Screen, TestStatus } from "./types";
@@ -75,14 +75,13 @@ export default function App() {
   const [bootVisible, setBootVisible] = useState(true);
   const [frameTime, setFrameTime] = useState(Date.now());
   const [frameError, setFrameError] = useState(false);
-  const [frameLoading, setFrameLoading] = useState(false);
   const frameTimer = useRef<number | null>(null);
 
   function scheduleNextFrame(delayMs: number) {
     if (frameTimer.current !== null) window.clearTimeout(frameTimer.current);
     frameTimer.current = window.setTimeout(() => {
       frameTimer.current = null;
-      setFrameLoading(true);
+      
       setFrameTime(Date.now());
     }, delayMs);
   }
@@ -110,7 +109,7 @@ export default function App() {
     }
     if (screen === "camera") {
       setFrameError(false);
-      setFrameLoading(true);
+      
       setFrameTime(Date.now());
     }
     return () => {
@@ -312,16 +311,11 @@ export default function App() {
               <div className="camera-screen">
                 <div className="preview-frame">
                   {selected?.connected ? (
-                    <img src={previewUrl(camera, frameTime)} alt={"Image de la caméra " + camera}
-                      onLoad={() => {
-                        setFrameError(false);
-                        setFrameLoading(false);
-                        scheduleNextFrame(1500);
-                      }}
+                    <img src={streamUrl(camera, frameTime)} alt={"Flux direct de la caméra " + camera}
+                      onLoad={() => setFrameError(false)}
                       onError={() => {
                         setFrameError(true);
-                        setFrameLoading(false);
-                        scheduleNextFrame(4500);
+                        scheduleNextFrame(2000);
                       }} />
                   ) : <div className="empty-preview"><CircleOff size={36} /> Caméra absente</div>}
                   {frameError && <div className="preview-error">Aperçu momentanément indisponible · nouvel essai automatique</div>}
@@ -329,15 +323,15 @@ export default function App() {
                 <aside className="camera-info">
                   <strong>CAM {camera}</strong>
                   <span className={"state-mark " + selected?.led}>{selected ? cameraLabel(selected) : "—"}</span>
-                  <p>Aperçu actualisé après réception de la précédente image. Les acquisitions des tests restent prioritaires.</p>
-                  <button className="action" disabled={!selected?.connected || frameLoading}
+                  <p>Flux MJPEG continu sans réencodage. Photographies PNG haute résolution prioritaires.</p>
+                  <button className="action" disabled={!selected?.connected}
                     onClick={() => {
                       if (frameTimer.current !== null) window.clearTimeout(frameTimer.current);
                       frameTimer.current = null;
-                      setFrameLoading(true);
+                      
                       setFrameTime(Date.now());
                       setFrameError(false);
-                    }}>Actualiser</button>
+                    }}>Reconnecter</button>
                   {selected?.led === "fault" && selected.connected
                     && !selected.active_test && !status?.thermal.fault &&
                     <button className="action" disabled={working}

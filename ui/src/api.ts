@@ -37,6 +37,6 @@ export function acknowledgeCamera(slot: number): Promise<{ ok: boolean }> {
   });
 }
 
-export function previewUrl(slot: number, moment: number): string {
-  return "/api/cameras/" + slot + "/preview?t=" + moment;
+export function streamUrl(slot: number, moment: number): string {
+  return "/api/cameras/" + slot + "/stream?t=" + moment;
 }
