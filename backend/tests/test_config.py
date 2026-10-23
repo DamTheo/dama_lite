@@ -29,6 +29,15 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load({"allow_os_shutdown": "false"})
 
+    def test_led_brightness_strict_maximum_10_percent(self):
+        self.assertEqual(0.1, load({}).led_brightness)
+        self.assertEqual(0.1, load({"led_brightness": 0.1}).led_brightness)
+        self.assertEqual(0.05, load({"led_brightness": 0.05}).led_brightness)
+        with self.assertRaisesRegex(ConfigError, "10 %"):
+            load({"led_brightness": 0.11})
+        with self.assertRaises(ConfigError):
+            load({"led_brightness": 1.0})
+
     def test_reject_remote_listener(self):
         with self.assertRaises(ConfigError):
             load({"host": "0.0.0.0"})

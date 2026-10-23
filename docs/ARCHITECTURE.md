@@ -80,3 +80,7 @@ DAMA-Lite/
 - **Le CPU ne mesure pas la température des résistances** et son alerte ne constitue pas une protection thermique de l'enceinte.
 - Pas de lecture automatique de la couleur ou d'AST/CMI : seules des séries de PNG bruts sont produites.
 - Une seule caméra branchée actuellement ; ne pas prétendre que les huit captures ont été vérifiées sur machine.
+
+## Luminosité LED plafonnée
+
+**Décision du 23/10/2026 : luminosité maximale à 10 %** pour les 64 NeoPixels sur BCM GPIO12. Le réglage logiciel reste à `0.10` par défaut ; toute valeur supérieure est rejetée à la lecture de configuration et à l'initialisation du contrôleur. L'extinction des 64 LED pendant les captures est maintenue.

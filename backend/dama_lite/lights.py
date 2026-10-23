@@ -22,6 +22,10 @@ def pixel_colors(states: list[str]) -> list[tuple[int, int, int]]:
 
 class LightController:
     def __init__(self, enabled: bool, gpio: int, brightness: float, driver=None):
+        # Verrouillage également à l'instanciation : ne pas dépendre
+        # uniquement de la lecture du fichier JSON.
+        if not 0 < brightness <= 0.10:
+            raise ValueError("L'intensité des 64 LED ne doit jamais dépasser 10 %.")
         self._lock = threading.RLock()
         self._blackout_depth = 0
         self._last = None

@@ -1,0 +1,28 @@
+[Unit]
+Description=DAMA Lite - profil de validation sans chauffage ni LED
+After=local-fs.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=damocles
+Group=damocles
+WorkingDirectory=/home/damocles/dama-lite-staging
+Environment=PYTHONPATH=/home/damocles/dama-lite-staging/backend
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/usr/bin/python3 -m dama_lite.safe_staging
+ExecStart=/usr/bin/python3 -m dama_lite --config /home/damocles/dama-lite-staging/config.staging.json
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=25
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

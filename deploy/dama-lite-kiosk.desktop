@@ -2,6 +2,6 @@
 Type=Application
 Name=DAMA Lite
 Comment=Écran tactile de l'incubateur DAMOCLES Dx
-Exec=chromium --kiosk --noerrdialogs --disable-session-crashed-bubble --disable-infobars http://127.0.0.1:8765
+Exec=/home/damocles/dama-lite-staging/deploy/start-kiosk.sh
 Terminal=false
 X-GNOME-Autostart-enabled=true

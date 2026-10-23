@@ -23,6 +23,10 @@ class LedTests(unittest.TestCase):
         self.assertEqual([(255, 170, 0)] * 8, colors[8:16])
         self.assertEqual([(255, 0, 0)] * 8, colors[16:24])
 
+    def test_never_allow_more_than_10_percent(self):
+        with self.assertRaisesRegex(ValueError, "10 %"):
+            LightController(False, 12, 0.11, driver=FakeStrip())
+
     def test_no_leds_during_photo(self):
         strip = FakeStrip()
         leds = LightController(False, 12, .1, driver=strip)

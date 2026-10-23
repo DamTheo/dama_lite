@@ -152,8 +152,11 @@ class Config:
             raise ConfigError("Le seuil limite de l'enceinte doit dépasser la régulation.")
         if c.cpu_cutoff_c <= c.cpu_warning_c:
             raise ConfigError("La coupure CPU doit être supérieure au seuil d'alerte.")
-        if not 0 < c.temperature_poll_s <= 10 or not 0 < c.led_brightness <= 0.25:
-            raise ConfigError("Cadence température ou luminosité invalide.")
+        if not 0 < c.temperature_poll_s <= 10:
+            raise ConfigError("Cadence de température invalide.")
+        # Intensité LED validée pour le laboratoire : maximum 10 %.
+        if not 0 < c.led_brightness <= 0.10:
+            raise ConfigError("Luminosité LED supérieure au maximum autorisé de 10 %.")
         if c.camera_interval_s != 300:
             raise ConfigError("La cadence prévue est une photo toutes les cinq minutes.")
         if c.shutdown_button_gpio is not None and (
