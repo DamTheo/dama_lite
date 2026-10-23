@@ -168,7 +168,7 @@ def run_server(config: Config) -> None:
         ensure_gpio_exclusive(config.heating_enabled, config.leds_enabled)
         service = DamaLiteService(config)
         server = ThreadingHTTPServer((config.host, config.port), make_handler(service))
-        server.daemon_threads = True
+        server.daemon_threads = False  # Attendre les handlers : worker vidéo avec timeout borné.
 
         def shutdown_signal(signum, _frame):
             LOG.warning("Signal OS %s : arrêt contrôlé", signum)

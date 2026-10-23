@@ -1,17 +1,22 @@
-"""USB V4L2 : chemins persistants, acquisition et aperçu sérialisés.
+"""Acquisition et aperçu V4L2 sérialisés dans un processus jetable.
 
-L'aperçu n'ouvre jamais une caméra en même temps qu'une photographie. Le verrou
-est global pour éviter de saturer le bus USB2 et les hubs partagés du Pi 4.
+Une caméra UVC ou OpenCV peut bloquer dans du code natif. Ne jamais effectuer
+l'ouverture USB dans le contrôleur du chauffage : le worker isolé est tué au
+bout du délai maximal et la session reçoit une erreur tracée.
 """
 from __future__ import annotations
 
 import logging
+import subprocess
+import sys
 import threading
 from pathlib import Path
 
 from .config import CameraSpec
 
 LOG = logging.getLogger(__name__)
+PREVIEW_TIMEOUT_S = 10
+PHOTO_TIMEOUT_S = 15
 
 
 class CameraError(RuntimeError):
@@ -21,7 +26,7 @@ class CameraError(RuntimeError):
 class CameraController:
     def __init__(self, cameras: tuple[CameraSpec, ...]):
         self.specs = {spec.slot: spec for spec in cameras}
-        self._usb_lock = threading.RLock()
+        self._usb_lock = threading.Lock()
 
     def ready(self, slot: int) -> bool:
         spec = self.specs.get(slot)
@@ -31,52 +36,52 @@ class CameraController:
         spec = self.specs.get(slot)
         if spec is None or not self.ready(slot) or spec.device is None:
             raise CameraError(f"Caméra {slot} absente ou non configurée")
+        # Un aperçu ne doit pas se mettre en file d'attente et retarder les
+        # photos des expériences. Les captures ont un droit prioritaire.
+        acquired = self._usb_lock.acquire(
+            blocking=False
+        ) if preview else self._usb_lock.acquire(timeout=20)
+        if not acquired:
+            raise CameraError(
+                "Bus USB occupé, réessayer l'aperçu."
+                if preview else "Bus USB inaccessible : photo non effectuée."
+            )
         try:
-            import cv2
-        except ImportError as exc:
-            raise CameraError("OpenCV (python3-opencv) non installé") from exc
-        # L'index video-index0 correspond au flux image; index1 peut porter
-        # uniquement des métadonnées UVC.
-        with self._usb_lock:
-            cap = cv2.VideoCapture(spec.device, cv2.CAP_V4L2)
+            timeout = PREVIEW_TIMEOUT_S if preview else PHOTO_TIMEOUT_S
+            command = [
+                sys.executable, "-m", "dama_lite.camera_worker",
+                "--device", spec.device,
+                "--width", str(spec.width),
+                "--height", str(spec.height),
+                "--pixel-format", spec.pixel_format,
+            ]
+            if preview:
+                command.append("--preview")
             try:
-                if not cap.isOpened():
-                    raise CameraError(f"Impossible d'ouvrir la caméra {slot}")
-                # La webcam UC60 observée sur Incub-resa prend en charge MJPG
-                # en 1280x720. MJPG réduit la bande passante des hubs USB.
-                requested_fourcc = cv2.VideoWriter_fourcc(*spec.pixel_format)
-                cap.set(cv2.CAP_PROP_FOURCC, requested_fourcc)
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, spec.width)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, spec.height)
-                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                frame = None
-                for _ in range(3):
-                    ok, candidate = cap.read()
-                    if ok and candidate is not None:
-                        frame = candidate
-                if frame is None:
-                    raise CameraError(f"Image indisponible pour la caméra {slot}")
-                actual_height, actual_width = frame.shape[:2]
-                if (actual_width, actual_height) != (spec.width, spec.height):
-                    raise CameraError(
-                        f"Résolution inattendue caméra {slot} : "
-                        f"{actual_width}x{actual_height} au lieu de "
-                        f"{spec.width}x{spec.height}."
-                    )
-                if preview:
-                    height, width = frame.shape[:2]
-                    if width > 800:
-                        frame = cv2.resize(frame, (800, round(height * 800 / width)))
-                ext = ".jpg" if preview else ".png"
-                args = [int(cv2.IMWRITE_JPEG_QUALITY), 80] if preview else [
-                    int(cv2.IMWRITE_PNG_COMPRESSION), 3
-                ]
-                success, encoded = cv2.imencode(ext, frame, args)
-                if not success:
-                    raise CameraError(f"Encodage {ext} impossible")
-                return encoded.tobytes()
-            finally:
-                cap.release()
+                result = subprocess.run(
+                    command, capture_output=True, check=False, timeout=timeout,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise CameraError(
+                    f"Caméra {slot} figée : acquisition interrompue après "
+                    f"{timeout} secondes."
+                ) from exc
+            except OSError as exc:
+                raise CameraError(f"Worker caméra introuvable : {exc}") from exc
+            if result.returncode != 0:
+                error = result.stderr.decode("utf-8", errors="replace")[-350:]
+                raise CameraError(
+                    f"Caméra {slot} en erreur ({result.returncode}) : "
+                    f"{error or 'sortie worker absente'}"
+                )
+            signature = b"\xff\xd8" if preview else b"\x89PNG\r\n\x1a\n"
+            if not result.stdout.startswith(signature):
+                raise CameraError(
+                    f"Caméra {slot} : image encodée absente ou invalide."
+                )
+            return result.stdout
+        finally:
+            self._usb_lock.release()
 
     def photo(self, slot: int) -> bytes:
         return self._capture(slot, preview=False)
