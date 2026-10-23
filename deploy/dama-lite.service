@@ -1,0 +1,25 @@
+[Unit]
+Description=DAMA Lite — incubateur 8 caméras et contrôleur thermique
+After=local-fs.target network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=damocles
+Group=damocles
+SupplementaryGroups=video gpio
+WorkingDirectory=/opt/dama-lite/backend
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/dama-lite/.venv/bin/python -m dama_lite --config /etc/dama-lite/config.json
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/dama-lite
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

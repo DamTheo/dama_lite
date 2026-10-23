@@ -1,0 +1,35 @@
+name: DAMA Lite validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile all Python sources
+        run: python -m compileall -q backend/dama_lite backend/tests
+      - name: Unit tests without hardware
+        run: python -m unittest discover -s backend/tests -v
+        env:
+          PYTHONPATH: backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        working-directory: ui
+        run: npm install --no-audit --no-fund
+      - name: Type check and production build
+        working-directory: ui
+        run: npm run build
