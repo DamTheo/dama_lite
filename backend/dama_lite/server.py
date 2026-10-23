@@ -59,7 +59,13 @@ def make_handler(service: DamaLiteService):
                     if service.state != "on":
                         self._error(503, "Incubateur en cours d'arrêt.")
                         return
-                    jpg = service.cameras.preview(int(match.group(1)))
+                    # Le retour vidéo ne doit pas contaminer les images avec
+                    # la lumière verte/jaune/rouge du bandeau NeoPixel.
+                    service.lights.blackout_on()
+                    try:
+                        jpg = service.cameras.preview(int(match.group(1)))
+                    finally:
+                        service.lights.blackout_off()
                     self._send(200, jpg, "image/jpeg")
                     return
                 if path.startswith("/api/"):

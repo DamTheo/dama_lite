@@ -1,5 +1,6 @@
 """Tests d'intégration locaux : aucune commande GPIO ni requête réseau réelle."""
 import tempfile
+import threading
 import unittest
 from dataclasses import replace
 from pathlib import Path
@@ -107,6 +108,51 @@ class RuntimeTests(unittest.TestCase):
         with self.assertRaises(CannotStart):
             self.manager.new_test(2, "Test-1")
         self.assertEqual(1, len(self.graph.names))
+
+    def test_graph_reservation_does_not_block_status_or_other_slot(self):
+        entered = threading.Event()
+        release = threading.Event()
+        errors = []
+
+        def stalled(name):
+            entered.set()
+            if not release.wait(4):
+                raise RuntimeError("Timeout test")
+            return "folder-" + name, None
+
+        self.graph.reserve_folder = stalled
+
+        def create():
+            try:
+                self.manager.new_test(1, "Ecoli-long")
+            except Exception as exc:
+                errors.append(exc)
+
+        worker = threading.Thread(target=create, daemon=True)
+        worker.start()
+        self.assertTrue(entered.wait(2), "L'appel Graph n'a pas démarré")
+        self.assertEqual(8, len(self.manager.led_states()))
+        self.assertEqual("running", self.manager.led_states()[0])
+        self.assertIsInstance(self.manager.overview(), list)
+        with self.assertRaises(CannotStart):
+            self.manager.new_test(1, "Ecoli-concurrent")
+        with self.assertRaises(CannotStart):
+            self.manager.new_test(2, "Ecoli-long")
+        release.set()
+        worker.join(timeout=3)
+        self.assertFalse(worker.is_alive())
+        self.assertFalse(errors)
+        self.assertEqual("Ecoli-long", self.store.tests()[0]["name"])
+
+    def test_graph_fails_without_leaking_slot_reservation(self):
+        def failed(_name):
+            raise RuntimeError("Graph indisponible")
+        self.graph.reserve_folder = failed
+        with self.assertRaises(RuntimeError):
+            self.manager.new_test(1, "Ecoli-err")
+        self.assertEqual([], self.manager.overview())
+        self.assertEqual("available", self.manager.led_states()[0])
+        self.assertEqual(set(), self.manager._reserving_slots)
 
     def test_acknowledgement_preserves_error(self):
         item = self.manager.new_test(1, "Test-fail")

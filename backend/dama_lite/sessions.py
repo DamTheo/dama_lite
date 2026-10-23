@@ -33,6 +33,10 @@ class SessionManager:
         self._stop = threading.Event()
         self._due: dict[str, float] = {}
         self._busy: set[str] = set()
+        # Une réservation Graph peut être lente. Ne pas retenir _lock sur le
+        # réseau, mais interdire deux créations simultanées pour le même slot.
+        self._reserving_slots: set[int] = set()
+        self._reserving_names: set[str] = set()
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="photo")
         self._thread: threading.Thread | None = None
 
@@ -40,36 +44,61 @@ class SessionManager:
         self._thread = threading.Thread(target=self._loop, daemon=True, name="scheduler")
         self._thread.start()
 
+    def _check_can_start(self, slot: int, name: str) -> None:
+        if self._stop.is_set():
+            raise CannotStart("Machine en cours d'extinction.")
+        if not self.cameras.ready(slot):
+            raise CannotStart(f"Caméra {slot} absente ou non configurée.")
+        state = self.thermal.snapshot()
+        if not state["ready"]:
+            detail = state["fault"] or (
+                "Chauffage non validé" if not state["heating_enabled"]
+                else "Enceinte sous 35 °C"
+            )
+            raise CannotStart(f"Nouvelle analyse impossible : {detail}.")
+        if any(s["camera_slot"] == slot for s in self.store.running()):
+            raise CannotStart(f"La caméra {slot} est déjà utilisée.")
+        if self.store.needs_ack(slot):
+            raise CannotStart(
+                "Dernier défaut de caméra non acquitté : vérifier puis acquitter."
+            )
+        if self.store.has_name(name):
+            raise CannotStart("Nom de test déjà utilisé : choisir un nom unique.")
+
     def new_test(self, slot: int, name: str) -> dict:
         name = validate_test_name(name)
         if slot not in range(1, 9):
             raise CannotStart("Caméra inexistante.")
         with self._lock:
-            if self._stop.is_set():
-                raise CannotStart("Machine en cours d'extinction.")
-            if not self.cameras.ready(slot):
-                raise CannotStart(f"Caméra {slot} absente ou non configurée.")
-            state = self.thermal.snapshot()
-            if not state["ready"]:
-                detail = state["fault"] or (
-                    "Chauffage non validé" if not state["heating_enabled"]
-                    else "Enceinte sous 35 °C"
-                )
-                raise CannotStart(f"Nouvelle analyse impossible : {detail}.")
-            if any(s["camera_slot"] == slot for s in self.store.running()):
-                raise CannotStart(f"La caméra {slot} est déjà utilisée.")
-            if self.store.needs_ack(slot):
-                raise CannotStart(
-                    "Dernier défaut de caméra non acquitté : vérifier puis acquitter."
-                )
-            if self.store.has_name(name):
-                raise CannotStart("Nom de test déjà utilisé : choisir un nom unique.")
-            # Créer obligatoirement le dossier distant avant de réserver le slot.
+            self._check_can_start(slot, name)
+            if slot in self._reserving_slots:
+                raise CannotStart(f"Caméra {slot} en cours de préparation.")
+            if name in self._reserving_names:
+                raise CannotStart("Un test avec ce nom est déjà en préparation.")
+            self._reserving_slots.add(slot)
+            self._reserving_names.add(name)
+        try:
+            # Réseau hors verrou : les autres caméras, l'écran et l'extinction
+            # continuent à répondre pendant l'appel Microsoft Graph.
             folder_id, folder_url = self.sharepoint.reserve_folder(name)
-            item = self.store.new_test(name, slot, folder_id, folder_url)
-            self._due[item["id"]] = time.monotonic()  # Première photo immédiate.
-            LOG.info("Analyse démarrée : %s, caméra %s", name, slot)
-            return item
+            with self._lock:
+                # Une panne/une chute thermique après l'appel Graph interdit
+                # toujours le lancement : ne jamais ignorer le seuil réel.
+                self._check_can_start(slot, name)
+                item = self.store.new_test(name, slot, folder_id, folder_url)
+                self._due[item["id"]] = time.monotonic()
+                LOG.info("Analyse démarrée : %s, caméra %s", name, slot)
+                return item
+        except CannotStart:
+            LOG.warning(
+                "Préparation annulée pour %s ; si le dossier SharePoint a déjà "
+                "été créé, vérifier son éventuelle absence de photos.", name
+            )
+            raise
+        finally:
+            with self._lock:
+                self._reserving_slots.discard(slot)
+                self._reserving_names.discard(name)
 
     def acknowledge_camera(self, slot: int) -> None:
         if slot not in range(1, 9):
@@ -79,8 +108,8 @@ class SessionManager:
                 raise CannotStart("Caméra absente : impossible d'acquitter.")
             if self.thermal.snapshot()["fault"]:
                 raise CannotStart("Corriger d'abord le défaut thermique.")
-            if any(s["camera_slot"] == slot for s in self.store.running()):
-                raise CannotStart("Impossible d'acquitter une caméra en cours d'analyse.")
+            if any(s["camera_slot"] == slot for s in self.store.running()) or slot in self._reserving_slots:
+                raise CannotStart("Impossible d'acquitter une caméra en cours d'utilisation.")
             if not self.store.ack_camera(slot):
                 raise CannotStart("Aucun défaut de caméra à acquitter.")
 
@@ -127,7 +156,7 @@ class SessionManager:
                 result.append("fault")
             elif slot in upload_faults:
                 result.append("fault")
-            elif slot in slots:
+            elif slot in slots or slot in self._reserving_slots:
                 result.append("running")
             elif slot in faults:
                 result.append("fault")
