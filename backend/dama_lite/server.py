@@ -13,6 +13,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 from .config import Config
+from .interlocks import ensure_gpio_exclusive
 from .service import DamaLiteService
 from .sessions import CannotStart
 from .sharepoint import NameConflict, SharePointError
@@ -163,6 +164,8 @@ def run_server(config: Config) -> None:
         except BlockingIOError as exc:
             raise RuntimeError("Un autre contrôleur DAMA Lite est déjà actif.") from exc
 
+        # Interdire la double commande GPIO avec les scripts historiques.
+        ensure_gpio_exclusive(config.heating_enabled, config.leds_enabled)
         service = DamaLiteService(config)
         server = ThreadingHTTPServer((config.host, config.port), make_handler(service))
         server.daemon_threads = True
