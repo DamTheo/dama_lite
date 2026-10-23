@@ -1,6 +1,7 @@
 """HTTP local sans exposition réseau ; fichiers du frontend et API tactile."""
 from __future__ import annotations
 
+import fcntl
 import json
 import logging
 import mimetypes
@@ -146,21 +147,30 @@ def make_handler(service: DamaLiteService):
 
 
 def run_server(config: Config) -> None:
-    service = DamaLiteService(config)
-    server = ThreadingHTTPServer((config.host, config.port), make_handler(service))
-    server.daemon_threads = True
+    # Empêche deux instances de DAMA Lite de piloter simultanément GPIO21.
+    # L'ancien Programme_complet.py n'utilise pas ce verrou : son éventuelle
+    # tâche de démarrage doit être neutralisée APRÈS audit, lors du déploiement.
+    config.state_dir.mkdir(parents=True, exist_ok=True)
+    with (config.state_dir / "runtime.lock").open("a") as process_lock:
+        try:
+            fcntl.flock(process_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError("Un autre contrôleur DAMA Lite est déjà actif.") from exc
 
-    def shutdown_signal(signum, _frame):
-        LOG.warning("Signal OS %s : arrêt contrôlé", signum)
-        # server.shutdown doit s'exécuter hors du thread serve_forever.
-        threading.Thread(target=server.shutdown, daemon=True).start()
+        service = DamaLiteService(config)
+        server = ThreadingHTTPServer((config.host, config.port), make_handler(service))
+        server.daemon_threads = True
 
-    signal.signal(signal.SIGTERM, shutdown_signal)
-    signal.signal(signal.SIGINT, shutdown_signal)
-    try:
-        service.start()
-        LOG.info("Interface locale : http://%s:%d", config.host, config.port)
-        server.serve_forever(poll_interval=0.5)
-    finally:
-        server.server_close()
-        service.stop()
+        def shutdown_signal(signum, _frame):
+            LOG.warning("Signal OS %s : arrêt contrôlé", signum)
+            threading.Thread(target=server.shutdown, daemon=True).start()
+
+        signal.signal(signal.SIGTERM, shutdown_signal)
+        signal.signal(signal.SIGINT, shutdown_signal)
+        try:
+            service.start()
+            LOG.info("Interface locale : http://%s:%d", config.host, config.port)
+            server.serve_forever(poll_interval=0.5)
+        finally:
+            server.server_close()
+            service.stop()

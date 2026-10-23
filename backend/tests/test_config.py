@@ -23,6 +23,12 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(300, cfg.camera_interval_s)
         self.assertEqual(SHAREPOINT_ROOT, cfg.sharepoint.folder_root)
 
+    def test_reject_string_bool_for_relay_safety(self):
+        with self.assertRaises(ConfigError):
+            load({"heating_enabled": "false"})
+        with self.assertRaises(ConfigError):
+            load({"allow_os_shutdown": "false"})
+
     def test_reject_remote_listener(self):
         with self.assertRaises(ConfigError):
             load({"host": "0.0.0.0"})

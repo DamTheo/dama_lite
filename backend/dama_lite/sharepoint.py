@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 import threading
 from pathlib import Path
 from urllib.parse import quote
@@ -56,16 +55,13 @@ class SharePointClient:
                 certificate = Path(self.cfg.public_cert_path)
                 if not private.is_file() or not certificate.is_file():
                     raise SharePointError("Certificats SharePoint absents sur le Pi.")
-                fingerprint = subprocess.run(
-                    ["openssl", "x509", "-in", str(certificate), "-noout",
-                     "-fingerprint", "-sha1"],
-                    check=True, capture_output=True, text=True, timeout=8,
-                ).stdout.strip().split("=", 1)[-1].replace(":", "")
+                # MSAL >=1.35 calcule automatiquement une empreinte SHA-256
+                # depuis le certificat public ; éviter l'empreinte SHA-1 obsolète.
                 self._app = ConfidentialClientApplication(
                     client_id=self.cfg.client_id,
                     authority=f"https://login.microsoftonline.com/{self.cfg.tenant_id}",
                     client_credential={
-                        "thumbprint": fingerprint,
+                        "public_certificate": certificate.read_text(encoding="utf-8"),
                         "private_key": private.read_text(encoding="utf-8"),
                     },
                 )
