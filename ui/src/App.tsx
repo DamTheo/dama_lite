@@ -191,7 +191,7 @@ export default function App() {
     <main className="machine-root">
       <header className="machine-header">
         <div className="brand">
-          <div className="brand-icon">D<span>.</span></div>
+          <img className="brand-symbol" src="/damocles-logo.svg" alt="Logo DAMOCLES Dx" />
           <div><strong>DAMA<span className="brand-accent">.</span> <small>LITE</small></strong>
             <span className="brand-sub">by DAMOCLES Dx</span></div>
         </div>

@@ -15,7 +15,7 @@ export function PowerOverlay({ mode }: { mode: "booting" | "shutting" }): ReactN
   return (
     <div className={"power-overlay " + mode} role="status" aria-live="polite">
       <div className="morph-stage">
-        <div className="morph-logo"><span className="brand-monogram">D<span>.</span></span></div>
+        <div className="morph-logo"><img className="morph-brand-symbol" src="/damocles-logo.svg" alt="" /></div>
         <div className="morph-face"><Face /></div>
       </div>
       <p className="morph-caption">{mode === "booting" ? "Démarrage DAMA Lite" : "Extinction DAMA Lite"}</p>
