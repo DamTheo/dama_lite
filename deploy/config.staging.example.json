@@ -31,13 +31,34 @@
       "height": 720,
       "pixel_format": "MJPG"
     },
-    {"slot": 2, "device": null},
-    {"slot": 3, "device": null},
-    {"slot": 4, "device": null},
-    {"slot": 5, "device": null},
-    {"slot": 6, "device": null},
-    {"slot": 7, "device": null},
-    {"slot": 8, "device": null}
+    {
+      "slot": 2,
+      "device": null
+    },
+    {
+      "slot": 3,
+      "device": null
+    },
+    {
+      "slot": 4,
+      "device": null
+    },
+    {
+      "slot": 5,
+      "device": null
+    },
+    {
+      "slot": 6,
+      "device": null
+    },
+    {
+      "slot": 7,
+      "device": null
+    },
+    {
+      "slot": 8,
+      "device": null
+    }
   ],
   "sharepoint": {
     "tenant_id": "",
@@ -45,6 +66,7 @@
     "drive_id": "",
     "private_key_path": "",
     "public_cert_path": "",
-    "folder_root": "03_Projets/04_Résazurine/03_Expérimentations & Résultats/DAMA-Lite"
+    "folder_root": "03_Projets/04_Résazurine/03_Expérimentations & Résultats/DAMA-Lite",
+    "expected_drive_name": "R&D Biologie"
   }
 }

@@ -43,6 +43,7 @@ class SharePointClient:
         self.cfg = cfg
         self._app = None
         self._lock = threading.RLock()
+        self._drive_verified = False
 
     def _token(self) -> str:
         if not self.cfg.configured:
@@ -107,8 +108,24 @@ class SharePointClient:
             return response.json() if response.content else {}
         raise SharePointError("Authentification Graph refusée après renouvellement.")
 
+    def _verify_drive(self) -> None:
+        if self._drive_verified:
+            return
+        with self._lock:
+            if self._drive_verified:
+                return
+            drive = quote(self.cfg.drive_id, safe="")
+            metadata = self._request("GET", f"{BASE}/drives/{drive}")
+            if metadata.get("name") != self.cfg.expected_drive_name:
+                raise SharePointError(
+                    "Mauvaise bibliothèque Microsoft Graph : l'ID choisi "
+                    "ne pointe pas vers R&D Biologie."
+                )
+            self._drive_verified = True
+
     def reserve_folder(self, name: str) -> tuple[str, str | None]:
         name = validate_test_name(name)
+        self._verify_drive()
         root = quote(self.cfg.folder_root, safe="/")
         drive = quote(self.cfg.drive_id, safe="")
         root_item = self._request(
@@ -130,6 +147,7 @@ class SharePointClient:
         return result["id"], result.get("webUrl")
 
     def upload(self, folder_id: str, filename: str, content: bytes) -> None:
+        self._verify_drive()
         if not filename.endswith(".png") or "/" in filename or "\\" in filename:
             raise SharePointError("Nom de fichier invalide.")
         drive = quote(self.cfg.drive_id, safe="")

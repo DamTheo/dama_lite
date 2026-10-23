@@ -44,6 +44,7 @@ class SharePointConfig:
     private_key_path: str = ""
     public_cert_path: str = ""
     folder_root: str = SHAREPOINT_ROOT
+    expected_drive_name: str = "R&D Biologie"
 
     @property
     def configured(self) -> bool:
@@ -56,6 +57,10 @@ class SharePointConfig:
         if self.folder_root.strip("/") != SHAREPOINT_ROOT:
             raise ConfigError(
                 "La destination doit être DAMA-Lite directement, sans sous-dossier caméra/date."
+            )
+        if self.expected_drive_name != "R&D Biologie":
+            raise ConfigError(
+                "La bibliothèque SharePoint doit être explicitement R&D Biologie."
             )
 
 
