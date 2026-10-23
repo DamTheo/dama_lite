@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+# Node
+node_modules/
+ui/dist/
+# Lab data, secrets and camera snapshots
+*.db
+*.db-shm
+*.db-wal
+spool/
+certs/
+secrets/
+*.pem
+*.key
+config.local.json
+.DS_Store
