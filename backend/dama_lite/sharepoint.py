@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import re
+import stat
 import threading
 from pathlib import Path
 from urllib.parse import quote
@@ -52,19 +53,35 @@ class SharePointClient:
             if self._app is None:
                 from msal import ConfidentialClientApplication
 
-                private = Path(self.cfg.private_key_path)
-                certificate = Path(self.cfg.public_cert_path)
-                if not private.is_file() or not certificate.is_file():
-                    raise SharePointError("Certificats SharePoint absents sur le Pi.")
-                # MSAL >=1.35 calcule automatiquement une empreinte SHA-256
-                # depuis le certificat public ; éviter l'empreinte SHA-1 obsolète.
+                if self.cfg.client_secret_path:
+                    # La valeur du secret n'est jamais présente en JSON,
+                    # argument CLI, URL, log ni Git. Seul son chemin est configuré.
+                    secret_file = Path(self.cfg.client_secret_path)
+                    if not secret_file.is_file():
+                        raise SharePointError(
+                            "Fichier local du secret Microsoft Entra introuvable."
+                        )
+                    if stat.S_IMODE(secret_file.stat().st_mode) & 0o077:
+                        raise SharePointError(
+                            "Permissions du secret Entra trop larges : chmod 600 requis."
+                        )
+                    credential = secret_file.read_text(encoding="utf-8").strip()
+                    if not credential:
+                        raise SharePointError("Secret Microsoft Entra vide.")
+                else:
+                    private = Path(self.cfg.private_key_path)
+                    certificate = Path(self.cfg.public_cert_path)
+                    if not private.is_file() or not certificate.is_file():
+                        raise SharePointError("Certificats SharePoint absents sur le Pi.")
+                    # MSAL >=1.35 utilise le certificat public pour SHA-256.
+                    credential = {
+                        "public_certificate": certificate.read_text(encoding="utf-8"),
+                        "private_key": private.read_text(encoding="utf-8"),
+                    }
                 self._app = ConfidentialClientApplication(
                     client_id=self.cfg.client_id,
                     authority=f"https://login.microsoftonline.com/{self.cfg.tenant_id}",
-                    client_credential={
-                        "public_certificate": certificate.read_text(encoding="utf-8"),
-                        "private_key": private.read_text(encoding="utf-8"),
-                    },
+                    client_credential=credential,
                 )
             result = self._app.acquire_token_for_client(
                 scopes=["https://graph.microsoft.com/.default"],

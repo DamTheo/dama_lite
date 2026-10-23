@@ -67,6 +67,7 @@
     "private_key_path": "",
     "public_cert_path": "",
     "folder_root": "03_Projets/04_Résazurine/03_Expérimentations & Résultats/DAMA-Lite",
-    "expected_drive_name": "R&D Biologie"
+    "expected_drive_name": "R&D Biologie",
+    "client_secret_path": ""
   }
 }

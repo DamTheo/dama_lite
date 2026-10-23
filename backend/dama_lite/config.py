@@ -43,17 +43,27 @@ class SharePointConfig:
     drive_id: str = ""
     private_key_path: str = ""
     public_cert_path: str = ""
+    client_secret_path: str = ""
     folder_root: str = SHAREPOINT_ROOT
     expected_drive_name: str = "R&D Biologie"
 
     @property
     def configured(self) -> bool:
-        return all([
-            self.tenant_id, self.client_id, self.drive_id,
-            self.private_key_path, self.public_cert_path,
-        ])
+        common = all([self.tenant_id, self.client_id, self.drive_id])
+        certificate = bool(self.private_key_path and self.public_cert_path)
+        client_secret = bool(self.client_secret_path)
+        return bool(common and (certificate or client_secret))
 
     def __post_init__(self):
+        certificate = bool(self.private_key_path or self.public_cert_path)
+        if self.client_secret_path and certificate:
+            raise ConfigError(
+                "Entra : choisir certificat OU secret client, jamais les deux."
+            )
+        if bool(self.private_key_path) != bool(self.public_cert_path):
+            raise ConfigError("Le certificat public exige une clé privée associée.")
+        if self.client_secret_path and not Path(self.client_secret_path).is_absolute():
+            raise ConfigError("Le secret Entra doit être un fichier à chemin absolu.")
         if self.folder_root.strip("/") != SHAREPOINT_ROOT:
             raise ConfigError(
                 "La destination doit être DAMA-Lite directement, sans sous-dossier caméra/date."

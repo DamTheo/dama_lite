@@ -38,6 +38,32 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load({"led_brightness": 1.0})
 
+    def test_accept_encrypted_certificate_or_secret_file_path(self):
+        from dama_lite.config import SharePointConfig
+        certificate = SharePointConfig(
+            tenant_id="tenant", client_id="client", drive_id="drive",
+            private_key_path="/etc/dama-lite/secrets/private.pem",
+            public_cert_path="/etc/dama-lite/secrets/public.pem",
+        )
+        secret = SharePointConfig(
+            tenant_id="tenant", client_id="client", drive_id="drive",
+            client_secret_path="/etc/dama-lite/secrets/entra-client-secret",
+        )
+        self.assertTrue(certificate.configured)
+        self.assertTrue(secret.configured)
+
+    def test_reject_conflicting_entra_credentials(self):
+        with self.assertRaisesRegex(ConfigError, "jamais les deux"):
+            load({"sharepoint": {
+                "client_secret_path": "/etc/dama-lite/secrets/secret",
+                "private_key_path": "/etc/dama-lite/secrets/private.pem",
+                "public_cert_path": "/etc/dama-lite/secrets/public.pem",
+            }})
+        with self.assertRaises(ConfigError):
+            load({"sharepoint": {"client_secret_path": "relative-secret.txt"}})
+        with self.assertRaises(TypeError):
+            load({"sharepoint": {"client_secret": "DONT_COPY_SECRETS_IN_JSON"}})
+
     def test_reject_remote_listener(self):
         with self.assertRaises(ConfigError):
             load({"host": "0.0.0.0"})
