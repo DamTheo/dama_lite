@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import fcntl
+import itertools
 import json
 import logging
 import mimetypes
@@ -65,6 +66,47 @@ def make_handler(service: DamaLiteService):
                 if path == "/api/status":
                     self._json(200, service.snapshot())
                     return
+                live = re.fullmatch(r"/api/cameras/([1-8])/stream", path)
+                if live:
+                    if service.state != "on":
+                        self._error(503, "Incubateur en cours d'arrêt.")
+                        return
+                    slot = int(live.group(1))
+                    # FFmpeg recopie directement les images MJPEG USB, sans
+                    # décoder, réencoder ni rouvrir la webcam à chaque trame.
+                    # Les LED de statut restent visibles pendant l'aperçu ;
+                    # elles sont éteintes uniquement lors des PNG scientifiques.
+                    with service.cameras.stream(slot) as frames:
+                        first = next(frames)
+                        self.send_response(200)
+                        self.send_header(
+                            "Content-Type",
+                            "multipart/x-mixed-replace; boundary=dama_frame",
+                        )
+                        self.send_header("Connection", "close")
+                        self.send_header("Cache-Control", "no-store, no-cache")
+                        self.send_header("X-Content-Type-Options", "nosniff")
+                        self.close_connection = True
+                        self.end_headers()
+                        try:
+                            for jpeg in itertools.chain((first,), frames):
+                                payload = (
+                                    b"--dama_frame\r\nContent-Type: image/jpeg\r\n"
+                                    + f"Content-Length: {len(jpeg)}\r\n\r\n".encode("ascii")
+                                    + jpeg + b"\r\n"
+                                )
+                                self.wfile.write(payload)
+                                self.wfile.flush()
+                                if service.state != "on":
+                                    break
+                        except (BrokenPipeError, ConnectionResetError):
+                            LOG.debug("Client de prévisualisation déconnecté.")
+                        except CameraError as exc:
+                            # En multipart les en-têtes HTTP sont déjà partis ;
+                            # ne jamais écrire une deuxième réponse JSON 503.
+                            LOG.warning("Fin flux caméra %d : %s", slot, exc)
+                        return
+
                 match = re.fullmatch(r"/api/cameras/([1-8])/preview", path)
                 if match:
                     if service.state != "on":

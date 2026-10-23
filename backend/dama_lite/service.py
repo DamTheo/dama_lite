@@ -116,6 +116,9 @@ class DamaLiteService:
         # Relais coupé AVANT toute opération réseau ou de stockage.
         self.thermal.stop()
         self.sessions.close()
+        # Stopper les flux MJPEG persistants avant la fermeture du service.
+        if hasattr(self.cameras, "close"):
+            self.cameras.close()
         self.uploader.stop()
         self.lights.close()
         if self.button is not None:

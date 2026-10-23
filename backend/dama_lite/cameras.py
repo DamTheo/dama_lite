@@ -11,6 +11,9 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+from contextlib import contextmanager
+
+from .live_preview import LivePreviewManager, LivePreviewError
 
 from .config import CameraSpec
 
@@ -27,6 +30,7 @@ class CameraController:
     def __init__(self, cameras: tuple[CameraSpec, ...]):
         self.specs = {spec.slot: spec for spec in cameras}
         self._usb_lock = threading.Lock()
+        self._live = LivePreviewManager()
 
     def ready(self, slot: int) -> bool:
         spec = self.specs.get(slot)
@@ -84,7 +88,31 @@ class CameraController:
             self._usb_lock.release()
 
     def photo(self, slot: int) -> bytes:
-        return self._capture(slot, preview=False)
+        if not self.ready(slot):
+            raise CameraError(f"Caméra {slot} absente ou non configurée.")
+        # Empêcher un réouverture UVC tant que l'image PNG est en cours.
+        try:
+            self._live.suspend_for_photo(slot)
+        except LivePreviewError as exc:
+            raise CameraError(str(exc)) from exc
+        try:
+            return self._capture(slot, preview=False)
+        finally:
+            self._live.resume_after_photo(slot)
+
+    @contextmanager
+    def stream(self, slot: int):
+        spec = self.specs.get(slot)
+        if spec is None or not self.ready(slot) or not spec.device:
+            raise CameraError(f"Caméra {slot} absente ou non configurée.")
+        try:
+            with self._live.open(slot, spec.device) as frames:
+                yield frames
+        except LivePreviewError as exc:
+            raise CameraError(str(exc)) from exc
+
+    def close(self) -> None:
+        self._live.close()
 
     def preview(self, slot: int) -> bytes:
         return self._capture(slot, preview=True)
