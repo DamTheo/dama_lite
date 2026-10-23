@@ -119,6 +119,11 @@ def make_handler(service: DamaLiteService):
                     service.sessions.stop_test(match.group(1))
                     self._json(200, {"ok": True})
                     return
+                acknowledge = re.fullmatch(r"/api/cameras/([1-8])/ack", path)
+                if acknowledge:
+                    service.sessions.acknowledge_camera(int(acknowledge.group(1)))
+                    self._json(200, {"ok": True})
+                    return
                 if path == "/api/shutdown":
                     service.request_shutdown()
                     self._json(202, {"status": "shutting"})

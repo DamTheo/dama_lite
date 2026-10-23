@@ -58,7 +58,11 @@ class SessionManager:
                 raise CannotStart(f"Nouvelle analyse impossible : {detail}.")
             if any(s["camera_slot"] == slot for s in self.store.running()):
                 raise CannotStart(f"La caméra {slot} est déjà utilisée.")
-            if any(s["name"] == name for s in self.store.tests(limit=100000)):
+            if self.store.needs_ack(slot):
+                raise CannotStart(
+                    "Dernier défaut de caméra non acquitté : vérifier puis acquitter."
+                )
+            if self.store.has_name(name):
                 raise CannotStart("Nom de test déjà utilisé : choisir un nom unique.")
             # Créer obligatoirement le dossier distant avant de réserver le slot.
             folder_id, folder_url = self.sharepoint.reserve_folder(name)
@@ -66,6 +70,19 @@ class SessionManager:
             self._due[item["id"]] = time.monotonic()  # Première photo immédiate.
             LOG.info("Analyse démarrée : %s, caméra %s", name, slot)
             return item
+
+    def acknowledge_camera(self, slot: int) -> None:
+        if slot not in range(1, 9):
+            raise CannotStart("Caméra inexistante.")
+        with self._lock:
+            if not self.cameras.ready(slot):
+                raise CannotStart("Caméra absente : impossible d'acquitter.")
+            if self.thermal.snapshot()["fault"]:
+                raise CannotStart("Corriger d'abord le défaut thermique.")
+            if any(s["camera_slot"] == slot for s in self.store.running()):
+                raise CannotStart("Impossible d'acquitter une caméra en cours d'analyse.")
+            if not self.store.ack_camera(slot):
+                raise CannotStart("Aucun défaut de caméra à acquitter.")
 
     def stop_test(self, test_id: str) -> None:
         with self._lock:
@@ -102,14 +119,18 @@ class SessionManager:
                  if s["state"] == "running"}
         # Un défaut sur la dernière session de ce slot reste visible jusqu'au
         # prochain test / acquittement ; une caméra absente est un défaut si configurée.
-        faults = {s["camera_slot"] for s in self.store.tests(limit=100000)
-                  if s["state"] in {"fault", "interrupted"}}
+        faults = {slot for slot in range(1, 9) if self.store.needs_ack(slot)}
+        upload_faults = self.store.upload_problem_slots()
         result = []
         for slot in range(1, 9):
-            if slot in faults and slot not in slots:
+            if state["fault"] and self.cameras.specs[slot].device:
+                result.append("fault")
+            elif slot in upload_faults:
                 result.append("fault")
             elif slot in slots:
-                result.append("fault" if state["fault"] else "running")
+                result.append("running")
+            elif slot in faults:
+                result.append("fault")
             elif self.cameras.specs[slot].device and not self.cameras.ready(slot):
                 result.append("fault")
             elif self.cameras.ready(slot) and state["ready"]:

@@ -35,6 +35,7 @@ class Store:
                     created_at TEXT NOT NULL,
                     ended_at TEXT,
                     images_count INTEGER NOT NULL DEFAULT 0,
+                    acknowledged INTEGER NOT NULL DEFAULT 0,
                     error TEXT
                 );
                 CREATE TABLE IF NOT EXISTS images (
@@ -57,6 +58,12 @@ class Store:
                 CREATE INDEX IF NOT EXISTS images_pending
                     ON images(uploaded, retry_after, taken_at);
             """)
+            # Migration non destructive pour les bases déjà créées.
+            existing = {row["name"] for row in self._db.execute("PRAGMA table_info(tests)")}
+            if "acknowledged" not in existing:
+                self._db.execute(
+                    "ALTER TABLE tests ADD COLUMN acknowledged INTEGER NOT NULL DEFAULT 0"
+                )
             # Un reboot ne doit pas relancer automatiquement une expérience interrompue.
             self._db.execute(
                 "UPDATE tests SET state='interrupted', ended_at=?, "
@@ -85,12 +92,46 @@ class Store:
     def tests(self, limit: int = 40) -> list[dict]:
         return self._rows(
             "SELECT t.*, (SELECT COUNT(*) FROM images i WHERE i.test_id=t.id "
-            "AND uploaded=0) AS pending_uploads FROM tests t "
+            "AND uploaded=0) AS pending_uploads, "
+            "(SELECT COUNT(*) FROM images i WHERE i.test_id=t.id "
+            "AND uploaded=0 AND error IS NOT NULL) AS upload_errors FROM tests t "
             "ORDER BY created_at DESC LIMIT ?", (limit,),
         )
 
     def running(self) -> list[dict]:
         return self._rows("SELECT * FROM tests WHERE state='running'")
+
+    def has_name(self, name: str) -> bool:
+        return bool(self._rows("SELECT 1 FROM tests WHERE name=? LIMIT 1", (name,)))
+
+    def last_camera_test(self, slot: int) -> dict | None:
+        results = self._rows(
+            "SELECT * FROM tests WHERE camera_slot=? ORDER BY created_at DESC LIMIT 1",
+            (slot,),
+        )
+        return results[0] if results else None
+
+    def needs_ack(self, slot: int) -> bool:
+        latest = self.last_camera_test(slot)
+        return bool(latest and latest["state"] in {"fault", "interrupted"}
+                    and not latest["acknowledged"])
+
+    def ack_camera(self, slot: int) -> bool:
+        with self._lock, self._db:
+            latest = self.last_camera_test(slot)
+            if latest is None or not self.needs_ack(slot):
+                return False
+            self._db.execute(
+                "UPDATE tests SET acknowledged=1 WHERE id=?", (latest["id"],)
+            )
+            return True
+
+    def upload_problem_slots(self) -> set[int]:
+        return {row["camera_slot"] for row in self._rows(
+            "SELECT DISTINCT t.camera_slot FROM tests t "
+            "JOIN images i ON i.test_id=t.id "
+            "WHERE i.uploaded=0 AND i.error IS NOT NULL"
+        )}
 
     def set_state(self, test_id: str, state: str, error: str | None = None) -> None:
         with self._lock, self._db:

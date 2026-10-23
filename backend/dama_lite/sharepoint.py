@@ -45,7 +45,7 @@ class SharePointClient:
         self._app = None
         self._lock = threading.RLock()
 
-    def _token(self, refresh: bool = False) -> str:
+    def _token(self) -> str:
         if not self.cfg.configured:
             raise SharePointError("SharePoint non configuré : impossible de démarrer une analyse.")
         with self._lock:
@@ -71,7 +71,6 @@ class SharePointClient:
                 )
             result = self._app.acquire_token_for_client(
                 scopes=["https://graph.microsoft.com/.default"],
-                force_refresh=refresh,
             )
             if not result.get("access_token"):
                 raise SharePointError(
@@ -97,7 +96,11 @@ class SharePointClient:
             except requests.RequestException as exc:
                 raise SharePointError(f"Réseau Graph indisponible : {exc}") from exc
             if response.status_code == 401 and attempt == 0:
-                token = self._token(refresh=True)
+                # Recréer le client pour éviter de reprendre un jeton 401
+                # mis en cache. Le flux client_credentials n'a pas de RT.
+                with self._lock:
+                    self._app = None
+                token = self._token()
                 continue
             if response.status_code == 409:
                 raise NameConflict("Un dossier de ce nom existe déjà dans DAMA-Lite.")
