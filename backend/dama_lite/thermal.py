@@ -26,17 +26,30 @@ class DS18B20:
         self.path = Path("/sys/bus/w1/devices") / sensor_id / "w1_slave"
 
     def read(self) -> float:
-        try:
-            lines = self.path.read_text(encoding="ascii").splitlines()
-            if len(lines) < 2 or not lines[0].strip().endswith("YES"):
-                raise SensorError("CRC DS18B20 invalide")
-            temp = float(lines[1].split("t=")[-1]) / 1000.0
-            # 85 °C est aussi la valeur de démarrage du DS18B20.
-            if not -20 < temp < 85:
-                raise SensorError(f"Valeur DS18B20 impossible : {temp} °C")
-            return temp
-        except (OSError, ValueError, IndexError) as exc:
-            raise SensorError(f"Lecture DS18B20 impossible : {exc}") from exc
+        # Le driver Linux 1-Wire renvoie parfois un CRC NO pendant une
+        # conversion; ne pas condamner la machine pour un seul échantillon.
+        # Après trois lectures réellement invalides (~0,5 s), on remonte
+        # SensorError : ThermalController coupe et verrouille le relais.
+        last_error: SensorError | None = None
+        for attempt in range(3):
+            try:
+                lines = self.path.read_text(encoding="ascii").splitlines()
+                if len(lines) < 2 or not lines[0].strip().endswith("YES"):
+                    raise SensorError("CRC DS18B20 invalide")
+                if "t=" not in lines[1]:
+                    raise SensorError("Champ température DS18B20 absent")
+                temp = float(lines[1].split("t=", 1)[1]) / 1000.0
+                # 85 °C peut être une valeur de démarrage, jamais valide.
+                if not -20 < temp < 85:
+                    raise SensorError(f"Valeur DS18B20 impossible : {temp} °C")
+                return temp
+            except SensorError as exc:
+                last_error = exc
+            except (OSError, ValueError, IndexError) as exc:
+                last_error = SensorError(f"Lecture DS18B20 impossible : {exc}")
+            if attempt < 2:
+                time.sleep(0.25)
+        raise last_error or SensorError("Sonde DS18B20 sans mesure valide.")
 
 
 def cpu_temperature() -> float | None:

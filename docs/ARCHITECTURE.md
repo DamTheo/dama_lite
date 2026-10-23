@@ -84,3 +84,7 @@ DAMA-Lite/
 ## Luminosité LED plafonnée
 
 **Décision du 23/10/2026 : luminosité maximale à 10 %** pour les 64 NeoPixels sur BCM GPIO12. Le réglage logiciel reste à `0.10` par défaut ; toute valeur supérieure est rejetée à la lecture de configuration et à l'initialisation du contrôleur. L'extinction des 64 LED pendant les captures est maintenue.
+
+## Tolérance aux défauts CRC 1-Wire (vérification sur Pi)
+
+Un défaut CRC transitoire de la sonde DS18B20 a été observé sur `Incub-resa`, alors que des lectures valides ont suivi. Le driver réessaie désormais jusqu'à **3 lectures espacées de 250 ms**. Aucune ancienne température n'est réutilisée comme mesure courante : **si les 3 lectures sont invalides, l'erreur est transmise et le relais est coupé et verrouillé**. Cette tolérance ne remplace pas la recherche d'une source électrique de CRC NO, ni la protection thermique matérielle indépendante.

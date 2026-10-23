@@ -1,8 +1,9 @@
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from dama_lite.config import Config
-from dama_lite.thermal import SensorError, ThermalController, heating_decision
+from dama_lite.thermal import DS18B20, SensorError, ThermalController, heating_decision
 
 
 class Sensor:
@@ -44,6 +45,26 @@ def config(heating=True):
 
 
 class ThermalTests(unittest.TestCase):
+    def test_ds18b20_retries_single_bad_crc(self):
+        sensor = DS18B20("28-0000006ca681")
+        bad = "00 ff : crc=ab NO\n00 ff t=22000"
+        good = "62 01 : crc=8c YES\n62 01 t=22562"
+        with patch.object(Path, "read_text", side_effect=[bad, good]) as read:
+            with patch("dama_lite.thermal.time.sleep") as sleep:
+                self.assertAlmostEqual(22.562, sensor.read())
+        self.assertEqual(2, read.call_count)
+        sleep.assert_called_once_with(0.25)
+
+    def test_ds18b20_permanent_bad_crc_still_faults(self):
+        sensor = DS18B20("28-0000006ca681")
+        bad = "00 ff : crc=ab NO\n00 ff t=22562"
+        with patch.object(Path, "read_text", return_value=bad) as read:
+            with patch("dama_lite.thermal.time.sleep") as sleep:
+                with self.assertRaisesRegex(SensorError, "CRC"):
+                    sensor.read()
+        self.assertEqual(3, read.call_count)
+        self.assertEqual(2, sleep.call_count)
+
     def test_hysteresis(self):
         self.assertTrue(heating_decision(False, 36.6, 37, .3))
         self.assertFalse(heating_decision(False, 37.0, 37, .3))
