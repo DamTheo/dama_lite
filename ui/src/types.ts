@@ -1,0 +1,43 @@
+export type LedState = "available" | "running" | "fault" | "off";
+export type Screen = "home" | "menu" | "new" | "cameras" | "camera" | "tests";
+
+export interface ThermalStatus {
+  temperature_c: number | null;
+  cpu_temperature_c: number | null;
+  heater_on: boolean;
+  heating_enabled: boolean;
+  ready: boolean;
+  fault: string | null;
+  cpu_warning: boolean;
+  last_read_at: number | null;
+}
+export interface CameraStatus {
+  slot: number;
+  configured: boolean;
+  connected: boolean;
+  led: LedState;
+  active_test: string | null;
+}
+export interface TestStatus {
+  id: string;
+  name: string;
+  camera_slot: number;
+  state: "running" | "stopped" | "fault" | "interrupted";
+  created_at: string;
+  ended_at: string | null;
+  images_count: number;
+  pending_uploads: number;
+  error: string | null;
+  next_photo_seconds: number | null;
+  folder_url: string | null;
+}
+export interface MachineStatus {
+  power: "starting" | "on" | "shutting" | "shutdown_failed" | "shutdown_disabled" | "off";
+  thermal: ThermalStatus;
+  cameras: CameraStatus[];
+  tests: TestStatus[];
+  sharepoint_configured: boolean;
+  interval_seconds: number;
+  temperature_start_min_c: number;
+  setpoint_c: number;
+}
