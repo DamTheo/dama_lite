@@ -87,6 +87,12 @@ class Config:
     @classmethod
     def load(cls, path: str | Path) -> "Config":
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
+        # Ne jamais interpréter la chaîne "false" comme True pour activer
+        # accidentellement le chauffage ou l'extinction système.
+        for flag in ("heating_enabled", "relay_active_high", "leds_enabled",
+                     "allow_os_shutdown"):
+            if flag in raw and type(raw[flag]) is not bool:
+                raise ConfigError(f"{flag} doit être un vrai booléen JSON.")
         default_cameras = [{"slot": n, "device": None} for n in range(1, 9)]
         cameras = tuple(CameraSpec(**entry) for entry in raw.get("cameras", default_cameras))
         if len(cameras) != 8 or {cam.slot for cam in cameras} != set(range(1, 9)):

@@ -114,6 +114,7 @@ class ThermalController:
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._closed = False
 
     def tick(self) -> None:
         """Une seule décision de régulation ; aussi testable sans Raspberry Pi."""
@@ -182,8 +183,14 @@ class ThermalController:
     def stop(self) -> None:
         self._stop.set()
         with self._lock:
+            if self._closed:
+                return
             self._disable_relay()
         if self._thread is not None and self._thread is not threading.current_thread():
             self._thread.join(timeout=self.cfg.temperature_poll_s + 2)
         with self._lock:
-            self.relay.close()
+            if not self._closed:
+                try:
+                    self.relay.close()
+                finally:
+                    self._closed = True

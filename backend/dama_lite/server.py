@@ -5,6 +5,7 @@ import json
 import logging
 import mimetypes
 import re
+import signal
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -141,10 +142,18 @@ def make_handler(service: DamaLiteService):
 
 def run_server(config: Config) -> None:
     service = DamaLiteService(config)
-    service.start()
     server = ThreadingHTTPServer((config.host, config.port), make_handler(service))
     server.daemon_threads = True
+
+    def shutdown_signal(signum, _frame):
+        LOG.warning("Signal OS %s : arrêt contrôlé", signum)
+        # server.shutdown doit s'exécuter hors du thread serve_forever.
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, shutdown_signal)
+    signal.signal(signal.SIGINT, shutdown_signal)
     try:
+        service.start()
         LOG.info("Interface locale : http://%s:%d", config.host, config.port)
         server.serve_forever(poll_interval=0.5)
     finally:

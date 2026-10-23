@@ -89,6 +89,8 @@ class DamaLiteService:
         # La sécurité thermique ne dépend pas de l'animation du navigateur.
         self.thermal.stop()
         self.sessions.stop_all()
+        # Les photos déjà acquises restent dans la file locale si la
+        # synchronisation Graph ne peut se terminer avant le poweroff.
         threading.Thread(
             target=self._poweroff_after_animation, name="poweroff", daemon=True
         ).start()
