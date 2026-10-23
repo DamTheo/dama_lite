@@ -20,6 +20,7 @@ class CameraSpec:
     device: str | None
     width: int = 1280
     height: int = 720
+    pixel_format: str = "MJPG"
 
     def __post_init__(self):
         if not 1 <= self.slot <= 8:
@@ -31,6 +32,8 @@ class CameraSpec:
             raise ConfigError("Les caméras exigent un chemin USB persistant /dev/v4l/by-path ou by-id.")
         if not 320 <= self.width <= 4096 or not 240 <= self.height <= 3072:
             raise ConfigError("Résolution caméra non prise en charge.")
+        if self.pixel_format not in {"MJPG", "YUYV"}:
+            raise ConfigError("Format caméra USB non autorisé (MJPG ou YUYV).")
 
 
 @dataclass(frozen=True)

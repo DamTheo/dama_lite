@@ -1,0 +1,50 @@
+{
+  "_COMMENT": "Essai sur Incub-resa, sans aucune commande de chauffage, LED ou arrêt OS.",
+  "host": "127.0.0.1",
+  "port": 8765,
+  "state_dir": "/home/damocles/dama-lite-staging-data",
+  "ui_dir": "/home/damocles/dama-lite-staging/ui/dist",
+  "sensor_id": "28-0000006ca681",
+  "heating_enabled": false,
+  "relay_gpio": 21,
+  "relay_active_high": true,
+  "setpoint_c": 37,
+  "start_min_c": 35,
+  "hysteresis_c": 0.3,
+  "enclosure_limit_c": 41,
+  "cpu_warning_c": 65,
+  "cpu_cutoff_c": 80,
+  "temperature_poll_s": 2,
+  "leds_enabled": false,
+  "led_gpio": 12,
+  "led_brightness": 0.1,
+  "camera_interval_s": 300,
+  "spool_limit_bytes": 4294967296,
+  "shutdown_button_gpio": null,
+  "allow_os_shutdown": false,
+  "shutdown_animation_s": 4.8,
+  "cameras": [
+    {
+      "slot": 1,
+      "device": "/dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2.1:1.0-video-index0",
+      "width": 1280,
+      "height": 720,
+      "pixel_format": "MJPG"
+    },
+    {"slot": 2, "device": null},
+    {"slot": 3, "device": null},
+    {"slot": 4, "device": null},
+    {"slot": 5, "device": null},
+    {"slot": 6, "device": null},
+    {"slot": 7, "device": null},
+    {"slot": 8, "device": null}
+  ],
+  "sharepoint": {
+    "tenant_id": "",
+    "client_id": "",
+    "drive_id": "",
+    "private_key_path": "",
+    "public_cert_path": "",
+    "folder_root": "03_Projets/04_Résazurine/03_Expérimentations & Résultats/DAMA-Lite"
+  }
+}

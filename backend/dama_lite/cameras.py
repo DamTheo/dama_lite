@@ -42,8 +42,13 @@ class CameraController:
             try:
                 if not cap.isOpened():
                     raise CameraError(f"Impossible d'ouvrir la caméra {slot}")
+                # La webcam UC60 observée sur Incub-resa prend en charge MJPG
+                # en 1280x720. MJPG réduit la bande passante des hubs USB.
+                requested_fourcc = cv2.VideoWriter_fourcc(*spec.pixel_format)
+                cap.set(cv2.CAP_PROP_FOURCC, requested_fourcc)
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, spec.width)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, spec.height)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                 frame = None
                 for _ in range(3):
                     ok, candidate = cap.read()
@@ -51,6 +56,13 @@ class CameraController:
                         frame = candidate
                 if frame is None:
                     raise CameraError(f"Image indisponible pour la caméra {slot}")
+                actual_height, actual_width = frame.shape[:2]
+                if (actual_width, actual_height) != (spec.width, spec.height):
+                    raise CameraError(
+                        f"Résolution inattendue caméra {slot} : "
+                        f"{actual_width}x{actual_height} au lieu de "
+                        f"{spec.width}x{spec.height}."
+                    )
                 if preview:
                     height, width = frame.shape[:2]
                     if width > 800:

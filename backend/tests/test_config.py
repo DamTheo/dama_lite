@@ -33,6 +33,14 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load({"host": "0.0.0.0"})
 
+    def test_invalid_uvc_format_rejected(self):
+        with self.assertRaises(ConfigError):
+            load({"cameras": [
+                {"slot": i, "device": None, "pixel_format": "INVALID"} if i == 1
+                else {"slot": i, "device": None}
+                for i in range(1, 9)
+            ]})
+
     def test_reject_same_camera_twice(self):
         cameras = [{"slot": x, "device": "/dev/v4l/by-path/camera"} for x in range(1, 9)]
         with self.assertRaises(ConfigError):
