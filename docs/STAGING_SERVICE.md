@@ -51,3 +51,7 @@ atteint et ne pas annoncer un redémarrage testé sans l'avoir effectué.
 Le reboot contrôlé a été effectué : `dama-lite-staging.service` est redevenu **actif et enabled**, Chromium a été lancé automatiquement en mode `--kiosk` vers `http://127.0.0.1:8765`, et le backend a servi la page React et les ressources CSS/JS avec HTTP 200. GPIO12 et GPIO21 sont restés en entrée (aucun pilotage LED/chauffage). Une capture DSI a confirmé un affichage 800×480 réel.
 
 L'essai de prévisualisation via le navigateur a montré que le remplacement forcé du JPEG toutes les 3 secondes provoquait des annulations HTTP si la webcam mettait plus de temps à répondre. Le composant React attend maintenant la fin du chargement (ou l'échec) avant de demander une autre image, avec délai de reprise ; le backend ignore les BrokenPipe dus aux clients déconnectés et limite les logs de statut.
+
+## Arrêt HTTP et systemd
+
+L'essai de `systemctl restart` après démarrage du kiosque a initialement atteint le `TimeoutStopSec`, car le navigateur maintenait ses sockets HTTP/1.1 ouvertes. Le serveur a été corrigé pour envoyer `Connection: close`, fermer rapidement les handlers et appeler `service.stop()` **avant** la fermeture des sockets. Le processus OpenCV est déjà isolé, avec un délai maximal par acquisition. Le redémarrage doit être revérifié sur la machine et ne doit plus présenter `Failed with result 'timeout'`.

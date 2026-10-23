@@ -31,6 +31,10 @@ def make_handler(service: DamaLiteService):
             self.send_response(code)
             self.send_header("Content-Type", mime)
             self.send_header("Content-Length", str(len(data)))
+            # Pas de connexion HTTP/1.1 persistante : sinon les connexions
+            # ouvertes de Chromium empêchent l'arrêt propre de systemd.
+            self.send_header("Connection", "close")
+            self.close_connection = True
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
@@ -181,7 +185,10 @@ def run_server(config: Config) -> None:
         ensure_gpio_exclusive(config.heating_enabled, config.leds_enabled)
         service = DamaLiteService(config)
         server = ThreadingHTTPServer((config.host, config.port), make_handler(service))
-        server.daemon_threads = False  # Attendre les handlers : worker vidéo avec timeout borné.
+        # Les requêtes HTTP sont jetables. Ne pas bloquer la coupure du
+        # chauffage derrière une connexion Chromium laissée ouverte.
+        server.daemon_threads = True
+        server.block_on_close = False
 
         def shutdown_signal(signum, _frame):
             LOG.warning("Signal OS %s : arrêt contrôlé", signum)
@@ -194,5 +201,9 @@ def run_server(config: Config) -> None:
             LOG.info("Interface locale : http://%s:%d", config.host, config.port)
             server.serve_forever(poll_interval=0.5)
         finally:
-            server.server_close()
-            service.stop()
+            # Toujours couper le relais avant toute attente de fermeture
+            # des sockets HTTP ou de terminaison des handlers.
+            try:
+                service.stop()
+            finally:
+                server.server_close()
