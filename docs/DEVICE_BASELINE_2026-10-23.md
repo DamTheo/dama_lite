@@ -15,7 +15,7 @@ sur la carte système de 29 Go. Node/npm non installés sur le Pi.
 | Enceinte, échantillon de lecture | 22,375 °C (pas une mesure de régulation à 37 °C) |
 | CPU, échantillon de lecture | 42,842 °C |
 | Synchronisation de l'horloge | NTP=yes |
-| Caméras branchées | 1 UC60 USB ; 7 restantes non branchées |
+| Caméras branchées au premier audit | 1 UC60 USB ; une deuxième a été branchée ultérieurement |
 | Caméra UC60 — liaison stable | \`/dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2.1:1.0-video-index0\` |
 | UC60 — formats annoncés | MJPEG dont 1280×720, 3264×2448 ; YUYV également |
 | GPIO12 (LED), GPIO21 (relais) au moment de l'audit | Entrées, pulldown ; **n'établit pas la polarité ni la sécurité électrique du relais** |
@@ -54,9 +54,7 @@ sur la carte système de 29 Go. Node/npm non installés sur le Pi.
 
 ## Prochaine bascule (non effectuée)
 
-**AUCUN service de production ni auto-démarrage installés. Chauffage jamais
-activé par DAMA Lite pendant les essais. Aucune photo n'a été envoyée à
-SharePoint par DAMA Lite à ce stade.**
+**Aucun service de production actif. Un service STAGING systemd et un kiosque autostart sont maintenant actifs et vérifiés après un reboot. Le chauffage et les LED physiques sont désactivés. Aucun fichier envoyé par DAMA Lite à SharePoint à ce stade.**
 
 Avant d'autoriser \`heating_enabled=true\` :
 
@@ -85,3 +83,13 @@ photos mises en attente de transfert.
 
 **Principe** : logiciel en développement ≠ qualification de sécurité
 thermique ≠ validation scientifique des incubations.
+
+## Addendum — mise en service sécurisée (23/10/2026)
+
+- `dama-lite-staging.service` : **enabled** et **active**, compte `damocles`, garde `ExecStartPre` refusant chauffage, LED, bouton et extinction OS dans ce profil.
+- LightDM autologin et navigateur Chromium `--kiosk` vérifiés après un reboot complet ; capture écran réelle **800×480** contrôlée ; lancement ancien `camera.desktop` sauvegardé et désactivé (lanceur absent).
+- GPIO 12 et GPIO 21 conservés en entrée (aucun actionneur commandé). Sonde DS18B20 lue via le noyau Linux.
+- CRC 1-Wire transitoire observé ; trois lectures espacées de 250 ms avant de considérer une mesure définitivement invalide ; **relais coupé et défaut verrouillé** si elles échouent, sans réutilisation de température périmée.
+- Deux webcams UC60 reconnues sur ports USB physiques `1.2.2` et `1.2.4`. Appairage de staging effectué explicitement avec sauvegarde de la configuration ; aperçus HTTP 200 pour CAM1 et CAM2.
+- Le rafraîchissement HTML n'annule plus la photo précédente, les sockets HTTP sont fermées par réponse et le redémarrage du service est de nouveau rapide.
+- Microsoft Entra reste en attente ; authentification future par certificat ou secret client conservé dans un fichier privé du Pi, jamais dans Git.

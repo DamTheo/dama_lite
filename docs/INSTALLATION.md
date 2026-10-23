@@ -1,6 +1,6 @@
 # Installation et qualification — à ne PAS exécuter avant autorisation
 
-La version GitHub **n'est pas installée** sur le Pi 4 \`192.168.1.201\`. Les commandes ci-dessous constituent une **procédure prévisionnelle** pour la phase ultérieure. Elles ne doivent pas être exécutées automatiquement.
+Le **staging sécurisé** est désormais installé sur le Pi 4 `192.168.1.201`, avec démarrage automatique vérifié. En revanche, **le service de production commandant la chauffe n'est ni installé ni qualifié**. Les commandes suivantes restent une procédure de bascule future, à ne pas exécuter automatiquement.
 
 ## Conditions préalables obligatoires
 
@@ -16,7 +16,7 @@ La version GitHub **n'est pas installée** sur le Pi 4 \`192.168.1.201\`. Les co
 
 Le dépôt est destiné à être placé dans \`/opt/dama-lite\` et sa configuration dans \`/etc/dama-lite/config.json\` ; les données persistantes se trouvent sous \`/var/lib/dama-lite\`.
 
-Prévoir Raspberry Pi OS Debian 12, Python 3.11 et Node.js 22 ou plus récent. Dépendances système : \`python3-venv\`, \`python3-opencv\`, \`python3-numpy\`, \`openssl\`, \`chromium\` et bibliothèques GPIO compatibles Pi 4.
+Prévoir Raspberry Pi OS Debian 12 et Python 3.11. Node.js 22+ peut rester sur PC01 pour construire l'interface, puis transférer `ui/dist` : aucune installation Node n'est requise sur le Pi. Dépendances système : `python3-venv`, `python3-opencv`, `python3-numpy`, `openssl`, `chromium` et bibliothèques GPIO compatibles Pi 4.
 
 \`\`\`bash
 # EXEMPLES - NE PAS LANCER SUR INCUB-RESA AVANT VALIDATION
@@ -33,7 +33,7 @@ Copier \`deploy/config.example.json\` dans \`/etc/dama-lite/config.json\` et per
 
 Le service \`deploy/dama-lite.service\` est un **gabarit**, pas une garantie d'accès GPIO. Vérifier notamment l'existence du groupe \`gpio\`, la compatibilité NeoPixel GPIO12 avec les droits non-root, \`NoNewPrivileges\` et \`ProtectSystem\`. Préférer un helper matériel à privilèges restreints plutôt que faire tourner l'API HTTP/SharePoint en root. Ne pas autoriser l'arrêt système au service avant inspection de polkit / logind.
 
-Le fichier \`deploy/dama-lite-kiosk.desktop\` sera installé sous \`~/.config/autostart/\` pour la session graphique de \`damocles\`, avec auto-login configuré et testé. La commande \`chromium\` peut varier selon l'image OS.
+Le fichier `deploy/dama-lite-kiosk.desktop` est déjà installé sous `~/.config/autostart/` et a été validé après reboot. Réutiliser cette entrée lors de la bascule de production sans créer un second parcours de démarrage.
 
 ## Tests hors matériel
 
@@ -45,7 +45,7 @@ npm install
 npm run build
 \`\`\`
 
-Le backend reste non opérationnel pour les acquisitions si le certificat SharePoint est absent : il n'existe **aucun mode simulation qui produirait de faux dossiers ou de fausses captures**.
+Le backend continue de refuser le démarrage d'analyses tant que Microsoft Entra n'est pas configuré (certificat ou secret client dans un fichier privé). Il n'existe **aucun mode simulation produisant de faux dossiers ou de fausses captures**.
 
 ## Déploiement et retour arrière
 
