@@ -27,6 +27,8 @@ export interface TestStatus {
   ended_at: string | null;
   images_count: number;
   pending_uploads: number;
+  upload_errors: number;
+  acknowledged: number;
   error: string | null;
   next_photo_seconds: number | null;
   folder_url: string | null;

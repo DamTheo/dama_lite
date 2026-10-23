@@ -239,3 +239,14 @@ svg { flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) {
   .face-eyes, .face-eye { animation: none !important; }
 }
+
+/* Historique compact, conservé après reboot et visible sans réseau */
+.history-panel { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+.history-panel h3 { color: #a5a6ac; font-size: 10px; letter-spacing: .15em; margin: 0 0 8px; }
+.history-row { display: grid; grid-template-columns: 60px minmax(0, 1fr) 90px 175px; gap: 8px; align-items: center; padding: 8px 10px; background: #16181c; border-bottom: 1px solid #323439; font-size: 12px; }
+.history-row strong { color: var(--yellow); font-size: 11px; }
+.history-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-row small { color: #a1a4aa; font-size: 10px; }
+.history-row small.history-fault { color: var(--red); }
+.history-row p { grid-column: 2 / -1; font-size: 10px; color: #efb8b5; margin: 0; }
+@media (max-width: 850px) { .history-row { grid-template-columns: 55px minmax(0,1fr) 65px 125px; gap: 6px; } }

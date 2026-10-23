@@ -3,7 +3,7 @@ import {
   AlertTriangle, ArrowLeft, Camera, Check, CircleOff, Cloud,
   CloudOff, Flame, Image, Play, Square, Thermometer, WifiOff,
 } from "lucide-react";
-import { getStatus, previewUrl, startTest, stopTest } from "./api";
+import { acknowledgeCamera, getStatus, previewUrl, startTest, stopTest } from "./api";
 import { Face, PowerOverlay } from "./Face";
 import TouchKeyboard from "./TouchKeyboard";
 import type { CameraStatus, MachineStatus, Screen, TestStatus } from "./types";
@@ -98,6 +98,7 @@ export default function App() {
   const cameras = status?.cameras ?? emptyCameras();
   const selected = cameras.find(c => c.slot === camera);
   const running = (status?.tests ?? []).filter(t => t.state === "running");
+  const history = (status?.tests ?? []).filter(t => t.state !== "running").slice(0, 12);
   const selectedReady = Boolean(
     selected?.led === "available" && status?.sharepoint_configured
     && status?.thermal.ready && online,
@@ -135,6 +136,19 @@ export default function App() {
       await refresh();
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Arrêt impossible");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function clearCameraFault(slot: number) {
+    setWorking(true);
+    try {
+      await acknowledgeCamera(slot);
+      setNotice("Défaut acquitté sur la caméra " + slot + ".");
+      await refresh();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Acquittement impossible");
     } finally {
       setWorking(false);
     }
@@ -280,6 +294,12 @@ export default function App() {
                   <span className={"state-mark " + selected?.led}>{selected ? LABELS[selected.led] : "—"}</span>
                   <p>Aperçu ponctuel, actualisé toutes les 3 secondes.</p>
                   <button className="action" onClick={() => { setFrameTime(Date.now()); setFrameError(false); }}>Actualiser</button>
+                  {selected?.led === "fault" && selected.connected
+                    && !selected.active_test && !status?.thermal.fault &&
+                    <button className="action" disabled={working}
+                      onClick={() => void clearCameraFault(camera)}>
+                      <Check size={18} /> Acquitter le défaut
+                    </button>}
                   <button className="action primary" disabled={!selectedReady} onClick={() => setScreen("new")}>
                     <Play size={18} /> Nouveau test
                   </button>
@@ -296,16 +316,28 @@ export default function App() {
                   <div className="test-row" key={test.id}>
                     <span className="test-cam">CAM {test.camera_slot}</span>
                     <div className="test-main"><strong>{test.name}</strong>
-                      <small>{test.images_count} photo(s) · {test.pending_uploads} en attente SharePoint</small></div>
+                      <small>{test.images_count} photo(s) · {test.pending_uploads} en attente SharePoint
+                        {test.upload_errors > 0 ? " · ERREUR DE SYNCHRONISATION" : ""}</small></div>
                     <div className="test-next"><small>PROCHAINE PHOTO</small><strong>{formatTime(test.next_photo_seconds)}</strong></div>
                     <button className="stop-btn" onClick={() => setConfirmStop(test)}><Square size={16} /> Arrêter</button>
                   </div>
                 ))}
-                {status?.tests.some(test => test.state === "fault" || test.state === "interrupted") && (
-                  <div className="test-alert"><AlertTriangle size={16} />
-                    Certaines analyses ont été interrompues : consulter le journal.
-                  </div>
-                )}
+                {history.length > 0 && <div className="history-panel">
+                  <h3>HISTORIQUE RÉCENT</h3>
+                  {history.map(test => (
+                    <div className="history-row" key={test.id}>
+                      <strong>CAM {test.camera_slot}</strong>
+                      <span>{test.name}</span>
+                      <small className={test.state === "fault" || test.state === "interrupted" ? "history-fault" : ""}>
+                        {test.state === "stopped" ? "Arrêté" :
+                          test.state === "fault" ? "Défaut" :
+                            test.state === "interrupted" ? "Interrompu" : test.state}
+                      </small>
+                      <small>{test.images_count} photo(s) · {test.pending_uploads} en attente</small>
+                      {test.error && <p>{test.error}{test.acknowledged ? " · acquitté" : ""}</p>}
+                    </div>
+                  ))}
+                </div>}
               </div>
             )}
           </div>

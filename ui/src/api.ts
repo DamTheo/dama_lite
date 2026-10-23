@@ -31,6 +31,12 @@ export function stopTest(id: string): Promise<{ ok: boolean }> {
   });
 }
 
+export function acknowledgeCamera(slot: number): Promise<{ ok: boolean }> {
+  return request("/api/cameras/" + slot + "/ack", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+  });
+}
+
 export function previewUrl(slot: number, moment: number): string {
   return "/api/cameras/" + slot + "/preview?t=" + moment;
 }
