@@ -23,7 +23,7 @@ def shutdown_approved(marker: Path = SHUTDOWN_AUTHORIZATION) -> bool:
     meta = marker.stat()
     return (
         meta.st_uid == 0
-        and stat.S_IMODE(meta.st_mode) & 0o077 == 0
+        and stat.S_IMODE(meta.st_mode) & 0o022 == 0
         and marker.read_text(encoding="ascii").strip() == SHUTDOWN_AUTH_VALUE
     )
 

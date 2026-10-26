@@ -34,7 +34,7 @@ n'exécute **aucun code Python ni script du dépôt Git utilisateur**.
 
 L'accès root au marqueur est validé par le fichier protégé
 \`/etc/dama-lite/shutdown-ui-authorized\`, valeur
-\`DAMA_LITE_UI_POWER_OFF_AUTHORIZED\`, propriétaire root mode 0600.
+\`DAMA_LITE_UI_POWER_OFF_AUTHORIZED\`, propriétaire root mode 0644 (marqueur non secret, non modifiable).
 L'utilisateur a autorisé explicitement cette nouvelle fonction.
 Elle n'autorise **ni chauffage GPIO21 ni modification des LED GPIO12**.
 
@@ -45,7 +45,7 @@ cd /home/damocles/dama-lite-staging
 sudo install -o root -g root -m 644 deploy/dama-lite-poweroff.service /etc/systemd/system/
 sudo install -o root -g root -m 644 deploy/dama-lite-poweroff.path /etc/systemd/system/
 sudo install -o root -g root -m 644 deploy/dama-lite-poweroff.tmpfiles /etc/tmpfiles.d/dama-lite-poweroff.conf
-sudo install -o root -g root -m 600 deploy/shutdown-ui-authorization.txt /etc/dama-lite/shutdown-ui-authorized
+sudo install -o root -g root -m 644 deploy/shutdown-ui-authorization.txt /etc/dama-lite/shutdown-ui-authorized
 sudo systemd-tmpfiles --create /etc/tmpfiles.d/dama-lite-poweroff.conf
 sudo systemctl daemon-reload
 sudo systemctl enable --now dama-lite-poweroff.path

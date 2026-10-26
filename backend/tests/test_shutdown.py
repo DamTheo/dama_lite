@@ -86,6 +86,18 @@ class ShutdownTests(unittest.TestCase):
         self.assertTrue(self.svc.snapshot()["shutdown_confirmation_required"])
         self.assertFalse(self.thermal.stopped)
 
+    def test_root_owned_read_only_operator_marker(self):
+        from dama_lite.safe_staging import shutdown_approved
+        from unittest.mock import Mock
+        marker = Mock()
+        marker.is_symlink.return_value = False
+        marker.is_file.return_value = True
+        marker.stat.return_value = Mock(st_uid=0, st_mode=0o100644)
+        marker.read_text.return_value = "DAMA_LITE_UI_POWER_OFF_AUTHORIZED"
+        self.assertTrue(shutdown_approved(marker))
+        marker.stat.return_value = Mock(st_uid=0, st_mode=0o100666)
+        self.assertFalse(shutdown_approved(marker))
+
     def test_staging_rejects_heat_even_if_poweroff_allowed(self):
         cfg = replace(self.cfg, allow_os_shutdown=True, heating_enabled=True)
         with patch("dama_lite.safe_staging.shutdown_approved", return_value=True):
