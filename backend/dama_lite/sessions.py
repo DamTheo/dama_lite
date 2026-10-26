@@ -122,14 +122,17 @@ class SessionManager:
             self.store.set_state(test_id, "stopped")
             LOG.info("Analyse arrêtée : %s", match["name"])
 
-    def stop_all(self) -> None:
+    def stop_all(self, *, confirmed: bool = False) -> None:
         with self._lock:
             self._stop.set()
             self._due.clear()
             for test in self.store.running():
-                self.store.set_state(
-                    test["id"], "interrupted", "Extinction : acquisition interrompue"
-                )
+                if confirmed:
+                    self.store.set_state(test["id"], "stopped")
+                else:
+                    self.store.set_state(
+                        test["id"], "interrupted", "Acquisition interrompue"
+                    )
 
     def overview(self) -> list[dict]:
         now = time.monotonic()
@@ -251,8 +254,8 @@ class SessionManager:
             with self._lock:
                 self._busy.discard(sid)
 
-    def close(self) -> None:
-        self.stop_all()
+    def close(self, *, confirmed_shutdown: bool = False) -> None:
+        self.stop_all(confirmed=confirmed_shutdown)
         if self._thread is not None:
             self._thread.join(timeout=3)
         self._executor.shutdown(wait=True, cancel_futures=True)

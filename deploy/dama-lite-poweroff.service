@@ -1,0 +1,11 @@
+[Unit]
+Description=DAMA Lite - extinction Linux après clôture confirmée
+ConditionPathExists=/run/dama-lite-poweroff/confirmed
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+# Le service root n'exécute jamais le code Python du dépôt utilisateur.
+ExecStartPre=/usr/bin/rm -f /run/dama-lite-poweroff/confirmed
+ExecStart=/usr/bin/systemctl poweroff

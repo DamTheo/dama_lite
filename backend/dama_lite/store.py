@@ -185,6 +185,16 @@ class Store:
                 (attempts, time.time() + retry_s, error[:1000], image_id),
             )
 
+    def pending_uploads_count(self) -> int:
+        return self._rows(
+            "SELECT COUNT(*) AS total FROM images WHERE uploaded=0"
+        )[0]["total"]
+
+    def checkpoint(self) -> None:
+        """Checkpoint SQLite après stabilisation des écritures photo."""
+        with self._lock:
+            self._db.execute("PRAGMA wal_checkpoint(PASSIVE)")
+
     def pending_bytes(self) -> int:
         result = self._rows(
             "SELECT COALESCE(SUM(byte_size),0) AS total FROM images WHERE uploaded=0"

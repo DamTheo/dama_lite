@@ -7,11 +7,25 @@ actionneurs via le service de validation au prochain reboot.
 from __future__ import annotations
 
 import sys
+import stat
 from pathlib import Path
 
 from .config import Config
 
 STAGING_CONFIG = Path("/home/damocles/dama-lite-staging/config.staging.json")
+SHUTDOWN_AUTHORIZATION = Path("/etc/dama-lite/shutdown-ui-authorized")
+SHUTDOWN_AUTH_VALUE = "DAMA_LITE_UI_POWER_OFF_AUTHORIZED"
+
+
+def shutdown_approved(marker: Path = SHUTDOWN_AUTHORIZATION) -> bool:
+    if marker.is_symlink() or not marker.is_file():
+        return False
+    meta = marker.stat()
+    return (
+        meta.st_uid == 0
+        and stat.S_IMODE(meta.st_mode) & 0o077 == 0
+        and marker.read_text(encoding="ascii").strip() == SHUTDOWN_AUTH_VALUE
+    )
 
 
 def validate_staging(cfg: Config) -> None:
@@ -20,8 +34,8 @@ def validate_staging(cfg: Config) -> None:
         unsafe.append("chauffage")
     if cfg.leds_enabled:
         unsafe.append("LED")
-    if cfg.allow_os_shutdown:
-        unsafe.append("arrêt du système")
+    if cfg.allow_os_shutdown and not shutdown_approved():
+        unsafe.append("extinction OS sans autorisation opérateur")
     if cfg.shutdown_button_gpio is not None:
         unsafe.append("bouton GPIO")
     if unsafe:
@@ -33,7 +47,10 @@ def validate_staging(cfg: Config) -> None:
 def main() -> None:
     config = Config.load(STAGING_CONFIG)
     validate_staging(config)
-    print("DAMA Lite STAGING : chauffage, LED et extinction désactivés.")
+    print(
+        "DAMA Lite STAGING : chauffage et LED internes désactivés ; "
+        "extinction OS autorisée=" + str(config.allow_os_shutdown)
+    )
 
 
 if __name__ == "__main__":

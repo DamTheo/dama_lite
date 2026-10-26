@@ -1,0 +1,2 @@
+# Dossier volatil RAM, writable uniquement par le compte du contrôleur.
+d /run/dama-lite-poweroff 0700 damocles damocles -

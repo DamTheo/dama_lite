@@ -1,0 +1,9 @@
+[Unit]
+Description=DAMA Lite - surveiller une demande locale d'extinction
+
+[Path]
+PathExists=/run/dama-lite-poweroff/confirmed
+Unit=dama-lite-poweroff.service
+
+[Install]
+WantedBy=multi-user.target

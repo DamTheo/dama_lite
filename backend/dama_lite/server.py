@@ -198,8 +198,18 @@ def make_handler(service: DamaLiteService):
                     self._json(200, {"ok": True})
                     return
                 if path == "/api/shutdown":
-                    service.request_shutdown()
-                    self._json(202, {"status": "shutting"})
+                    if set(body) != {"confirm_active_tests"} or type(body["confirm_active_tests"]) is not bool:
+                        raise ValueError("Confirmer explicitement l'arrêt des expériences.")
+                    outcome = service.request_shutdown(
+                        confirmed_active_tests=body["confirm_active_tests"]
+                    )
+                    self._json(202, outcome)
+                    return
+                if path == "/api/shutdown/cancel":
+                    if body:
+                        raise ValueError("Requête d'annulation invalide.")
+                    service.cancel_shutdown_confirmation()
+                    self._json(200, {"ok": True})
                     return
                 self._error(404, "Endpoint inconnu.")
             except NameConflict as exc:
