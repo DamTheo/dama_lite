@@ -330,7 +330,9 @@ export default function App() {
                 {cameras.map(cam => (
                   <CameraTile camera={cam} key={cam.slot} onClick={() => {
                     setCamera(cam.slot);
-                    setScreen(cam.connected ? "camera" : "cameras");
+                    // Même une caméra déconnectée dispose de son écran de détail
+                    // et déclenche le repérage LED rouge à sa position.
+                    setScreen("camera");
                   }} />
                 ))}
               </div>

@@ -30,11 +30,11 @@ def current_status() -> dict:
         return json.load(response)
 
 
-def smoke(slot: int, duration: float) -> dict:
+def smoke(slot: int, duration: float, *, allow_disconnected: bool = False) -> dict:
     before = current_status()
     if before["thermal"]["heating_enabled"] or before["thermal"]["heater_on"]:
         raise RuntimeError("Essai réservé au staging : chauffe doit être désactivée.")
-    if not before["cameras"][slot - 1]["connected"]:
+    if not before["cameras"][slot - 1]["connected"] and not allow_disconnected:
         raise RuntimeError("Caméra sélectionnée déconnectée.")
     try:
         changed = selection(slot)
@@ -60,10 +60,17 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--camera", type=int, default=3, choices=range(1, 9))
     parser.add_argument("--seconds", type=float, default=1.5)
+    parser.add_argument(
+        "--allow-disconnected", action="store_true",
+        help="Tester le repérage rouge sans prétendre que l'USB fonctionne.",
+    )
     args = parser.parse_args()
     if not 0.1 <= args.seconds <= 3.0:
         parser.error("0,1 à 3 secondes, sans dépassement du TTL.")
-    print(json.dumps(smoke(args.camera, args.seconds), ensure_ascii=False))
+    print(json.dumps(smoke(
+        args.camera, args.seconds,
+        allow_disconnected=args.allow_disconnected,
+    ), ensure_ascii=False))
 
 
 if __name__ == "__main__":
