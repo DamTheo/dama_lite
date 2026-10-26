@@ -17,3 +17,18 @@ dossier ni photo n'est créé**. Pour le mode MS_*, le backend utilise
 l'endpoint OAuth 2.0 client_credentials directement avec \`requests\`,
 en gardant le secret et le jeton en mémoire uniquement. MSAL reste
 disponible pour les autres profils d'authentification.
+
+
+### Épreuve d'écriture limitée et traçable
+
+Après une vérification \`--verify\` positive, \`--write-probe\` crée
+**un dossier par test** intitulé \`DAMA-Lite-Verification-AAAAMMJJ...\`
+et téléverse \`verification_ecriture.png\` (image synthétique 1×1).
+Aucune caméra ni actionneur n'est utilisé, et rien n'est écrit
+dans un dossier « caméra ». Le dossier de vérification reste
+visiblement nommé et peut être archivé/supprimé après inspection.
+
+\`\`\`bash
+cd /home/damocles/dama-lite-staging
+PYTHONPATH=backend python3 -m dama_lite.graph_setup --write-probe
+\`\`\`

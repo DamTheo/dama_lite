@@ -32,6 +32,15 @@ class ExistingEntraTests(unittest.TestCase):
             self.assertFalse(got.heating_enabled)
             self.assertFalse(got.leds_enabled)
 
+    def test_verification_png_is_well_formed(self):
+        from dama_lite.graph_setup import validation_png
+        import struct
+        import zlib
+        png = validation_png()
+        self.assertTrue(png.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertEqual((1, 1), struct.unpack(">II", png[16:24]))
+        self.assertEqual(b"IDAT", png[37:41])
+
     def test_other_config_cannot_be_modified(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
