@@ -197,8 +197,9 @@ class Config:
             or not 2 <= c.shutdown_button_gpio <= 27
         ):
             raise ConfigError("GPIO du bouton invalide ou déjà réservé.")
-        if c.allow_os_shutdown and c.shutdown_button_gpio is None:
-            raise ConfigError("La coupure OS nécessite un bouton physique configuré et vérifié.")
+        # Depuis l'ajout du bouton tactile, l'extinction Linux peut
+        # fonctionner sans bouton GPIO physique. L'autorisation réelle
+        # est imposée par safe_staging + passerelle systemd root dédiée.
         if c.shutdown_animation_s < 3.6:
             raise ConfigError("Conserver le temps nécessaire à l'animation d'extinction.")
         return c

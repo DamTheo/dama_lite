@@ -76,3 +76,14 @@ l'incubateur et pouvoir le rallumer.
 - Les photos du spool sont sauvegardées sur le Pi et retentées sur
   SharePoint au prochain démarrage : un arrêt ne garantit pas que les
   transferts en attente soient déjà terminés.
+
+
+## Note de migration : arrêt tactile sans bouton GPIO obligatoire
+
+L'ancienne validation \`Config.load\` exigeait un bouton GPIO physique
+pour tout \`allow_os_shutdown=true\`. Ce contrat n'était plus adapté
+à la demande explicite d'un **bouton tactile** sur l'écran 7".
+Le fichier JSON accepte désormais l'arrêt par interface tactile,
+**sans affecter l'état des résistances ou ajouter un GPIO**.
+L'autorisation est assurée à la place par la vérification du marqueur
+root non modifiable et la passerelle \`dama-lite-poweroff.path\`.

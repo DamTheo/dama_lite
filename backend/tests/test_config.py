@@ -81,6 +81,11 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load({"cameras": cameras})
 
+    def test_allow_os_shutdown_by_confirmed_touch_ui_without_gpio(self):
+        c = load({"allow_os_shutdown": True, "shutdown_button_gpio": None})
+        self.assertTrue(c.allow_os_shutdown)
+        self.assertIsNone(c.shutdown_button_gpio)
+
     def test_reject_conflicting_gpio(self):
         with self.assertRaises(ConfigError):
             load({"shutdown_button_gpio": 21})
