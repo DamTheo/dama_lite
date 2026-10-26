@@ -39,6 +39,8 @@ class DamaLiteService:
         )
         self.button = None
         self._closing = False
+        self._ui_selected_slot: int | None = None
+        self._ui_selected_until = 0.0
 
     def start(self) -> None:
         # Aucun démarrage d'acquisition ou LED ne doit précéder le contrôleur.
@@ -55,6 +57,28 @@ class DamaLiteService:
         self.state = "on"
         LOG.info("DAMA Lite démarré (chauffe autorisée=%s)",
                  self.cfg.heating_enabled)
+
+    def select_ui_camera(self, slot: int | None) -> None:
+        """Repère la préparation sur le bandeau, sans autoriser de test.
+
+        La sélection est éphémère : elle expire seule si le navigateur se
+        ferme, perd le réseau ou change de page sans nettoyage.
+        """
+        if slot is not None and (type(slot) is not int or not 1 <= slot <= 8):
+            raise ValueError("Caméra à sélectionner : numéro entre 1 et 8.")
+        with self._lock:
+            if slot is not None and self.state != "on":
+                raise ValueError("Incubateur non disponible.")
+            self._ui_selected_slot = slot
+            self._ui_selected_until = (
+                time.monotonic() + 4.0 if slot is not None else 0.0
+            )
+
+    def ui_selected_camera(self) -> int | None:
+        with self._lock:
+            if self.state != "on" or time.monotonic() >= self._ui_selected_until:
+                return None
+            return self._ui_selected_slot
 
     def snapshot(self) -> dict:
         thermo = self.thermal.snapshot()
@@ -77,6 +101,7 @@ class DamaLiteService:
             "tests": items,
             "sharepoint_configured": self.cfg.sharepoint.configured,
             "led_blackout": self.lights.blackout_active,
+            "ui_selected_camera": self.ui_selected_camera(),
             "interval_seconds": self.cfg.camera_interval_s,
             "temperature_start_min_c": self.cfg.start_min_c,
             "setpoint_c": self.cfg.setpoint_c,
@@ -88,6 +113,8 @@ class DamaLiteService:
                 return
             self._closing = True
             self.state = "shutting"
+            self._ui_selected_slot = None
+            self._ui_selected_until = 0.0
         LOG.warning("Extinction demandée : sécurisation des résistances et sessions.")
         # La sécurité thermique ne dépend pas de l'animation du navigateur.
         self.thermal.stop()
@@ -116,6 +143,8 @@ class DamaLiteService:
             if self.state == "off":
                 return
             self.state = "shutting"
+            self._ui_selected_slot = None
+            self._ui_selected_until = 0.0
         # Relais coupé AVANT toute opération réseau ou de stockage.
         self.thermal.stop()
         self.sessions.close()

@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import signal
 import stat
 import threading
@@ -69,33 +70,70 @@ def should_hold_previous(
     return last_valid_at is not None and now - last_valid_at < grace_seconds
 
 
+def gentle_pulse_factor(timestamp: float, cycle_seconds: float = 2.8) -> float:
+    """Respiration douce de 18 à 100 % du vert (NeoPixel limité à 10 %)."""
+    return 0.59 + 0.41 * math.cos(2.0 * math.pi * timestamp / cycle_seconds)
+
+
+def selected_available_slot(snapshot: dict, states: list[str]) -> int | None:
+    """Priorité : défaut rouge / test jaune / blackout avant repérage vert."""
+    slot = snapshot.get("ui_selected_camera")
+    if type(slot) is not int or not 1 <= slot <= 8:
+        return None
+    if snapshot.get("led_blackout") or states[slot - 1] != "available":
+        return None
+    return slot
+
+
 def run_polling(controller: LightController, stopped: threading.Event) -> None:
-    last_states = None
+    last_states: list[str] | None = None
+    last_selected: int | None = None
+    statuses = ["off"] * 8
+    selected = None
     last_valid_at: float | None = None
+    next_poll = 0.0
     unreachable = False
-    while not stopped.wait(0.4):
-        try:
-            with urlopen(STATUS_URL, timeout=1.5) as reply:
-                snapshot = json.load(reply)
-            statuses = (
-                ["off"] * 8 if snapshot.get("led_blackout")
-                else states_from_snapshot(snapshot)
+    # Le rendu visuel (~8 Hz) est découplé du statut réseau (~1,6 Hz)
+    # pour éviter de multiplier les requêtes HTTP durant la pulsation.
+    while not stopped.wait(0.12):
+        now = time.monotonic()
+        if now >= next_poll:
+            next_poll = now + 0.60
+            try:
+                with urlopen(STATUS_URL, timeout=1.5) as reply:
+                    snapshot = json.load(reply)
+                statuses = (
+                    ["off"] * 8 if snapshot.get("led_blackout")
+                    else states_from_snapshot(snapshot)
+                )
+                selected = selected_available_slot(snapshot, statuses)
+                last_valid_at = time.monotonic()
+                if unreachable:
+                    LOG.info("Connexion locale au contrôleur rétablie.")
+                unreachable = False
+            except (URLError, OSError, ValueError, TypeError, TimeoutError):
+                if not should_hold_previous(last_valid_at, time.monotonic()):
+                    if not unreachable:
+                        LOG.warning("Statut local indisponible depuis 3 s : LED éteintes.")
+                        unreachable = True
+                    statuses = ["off"] * 8
+                    selected = None
+        if statuses != last_states or selected != last_selected:
+            LOG.info(
+                "LED GPIO12 (8 x 8, 10%%): %s ; repérage=%s",
+                ",".join(statuses), selected,
             )
-            last_valid_at = time.monotonic()
-            if unreachable:
-                LOG.info("Connexion locale au contrôleur rétablie.")
-            unreachable = False
-        except (URLError, OSError, ValueError, TypeError, TimeoutError):
-            if should_hold_previous(last_valid_at, time.monotonic()):
-                continue
-            if not unreachable:
-                LOG.warning("Statut local indisponible depuis 3 s : LED éteintes.")
-                unreachable = True
-            statuses = ["off"] * 8
-        if statuses != last_states:
-            controller.update(statuses)
-            LOG.info("LED GPIO12 (8 x 8, 10%%): %s", ",".join(statuses))
-            last_states = statuses
+            last_states = list(statuses)
+            last_selected = selected
+            controller.update(
+                statuses, pulse_slot=selected,
+                pulse_factor=gentle_pulse_factor(now) if selected is not None else 1.0,
+            )
+        elif selected is not None:
+            controller.update(
+                statuses, pulse_slot=selected,
+                pulse_factor=gentle_pulse_factor(now),
+            )
 
 
 def selftest(controller: LightController, delay: float = 0.25) -> None:

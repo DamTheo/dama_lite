@@ -1,7 +1,10 @@
 """Contrôle LED hors GPIO, avec un faux bandeau de 64 LED."""
 import unittest
 
-from dama_lite.led_bridge import states_from_snapshot, selftest, should_hold_previous
+from dama_lite.led_bridge import (
+    gentle_pulse_factor, selected_available_slot, states_from_snapshot,
+    selftest, should_hold_previous,
+)
 from dama_lite.lights import LightController
 
 
@@ -54,6 +57,52 @@ class LedBridgeTests(unittest.TestCase):
         self.assertTrue(should_hold_previous(100.0, 102.99))
         self.assertFalse(should_hold_previous(100.0, 103.0))
         self.assertFalse(should_hold_previous(100.0, 104.5))
+
+    def test_soft_selection_blinks_only_available_slot(self):
+        data = {
+            "power": "on", "ui_selected_camera": 3,
+            "thermal": {"fault": None},
+            "cameras": [{
+                "slot": slot, "configured": True, "connected": True,
+                "health": "available",
+            } for slot in range(1, 9)],
+        }
+        states = states_from_snapshot(data)
+        self.assertEqual(3, selected_available_slot(data, states))
+        data["cameras"][2]["health"] = "running"
+        states = states_from_snapshot(data)
+        self.assertIsNone(selected_available_slot(data, states))
+        data["cameras"][2]["health"] = "fault"
+        self.assertIsNone(selected_available_slot(data, states_from_snapshot(data)))
+        data["cameras"][2]["health"] = "available"
+        data["led_blackout"] = True
+        self.assertIsNone(selected_available_slot(data, states_from_snapshot(data)))
+        data["led_blackout"] = False
+        data["ui_selected_camera"] = True
+        self.assertIsNone(selected_available_slot(data, states_from_snapshot(data)))
+
+    def test_pulse_never_exceeds_global_brightness_limit(self):
+        from math import isclose
+        self.assertTrue(isclose(gentle_pulse_factor(0), 1.0))
+        samples = [gentle_pulse_factor(index * 0.05) for index in range(120)]
+        self.assertGreaterEqual(min(samples), 0.179)
+        self.assertLessEqual(max(samples), 1.0)
+        strip = SimulatedPixels()
+        controller = LightController(
+            enabled=False, gpio=12, brightness=.1, driver=strip
+        )
+        controller.update(["available"] * 8, pulse_slot=3, pulse_factor=0.20)
+        self.assertEqual([(0, 255, 0)] * 8, strip.colors[:8])
+        self.assertEqual([(0, 51, 0)] * 8, strip.colors[16:24])
+        self.assertEqual([(0, 255, 0)] * 8, strip.colors[24:32])
+        controller.update(
+            ["available", "available", "fault"] + ["available"] * 5,
+            pulse_slot=3, pulse_factor=0.2,
+        )
+        self.assertEqual([(255, 0, 0)] * 8, strip.colors[16:24])
+        with self.assertRaises(ValueError):
+            controller.update(["available"] * 8, pulse_slot=3, pulse_factor=1.2)
+        controller.close()
 
     def test_leds_off_if_status_incomplete(self):
         self.assertEqual(["off"] * 8, states_from_snapshot({"power": "on"}))

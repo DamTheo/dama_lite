@@ -113,3 +113,20 @@ maximum lorsqu'une seule requête de statut échoue, puis
 Les ordres de blackout photo correctement reçus ne bénéficient
 d'aucune temporisation et restent immédiats. La fréquence de lecture
 est réduite à 2,5 Hz pour limiter la charge du Pi.
+
+\n## Repérage tactile d'un emplacement (nouvelle analyse)\n
+Pendant l'écran « Nouvelle analyse », le kiosque envoie la caméra choisie
+via `POST /api/selection` à intervalles réguliers. Le backend mémorise
+une sélection volatile expirant automatiquement après **4 secondes** ;
+aucun enregistrement SQLite ni écriture SharePoint.
+
+Seul le segment physique correspondant (8 LED) est modulé doucement
+entre **18 et 100 % du vert déjà limité matériellement à 10 %**,
+avec période de 2,8 secondes. Les sept autres segments restent dans leur
+état normal. **Une analyse en cours reste jaune ; une panne reste rouge**,
+même si cette caméra est sélectionnée. Le noir pendant la photo scientifique
+reste prioritaire. Lors du retour au menu ou après lancement, la sélection
+est effacée ; un navigateur planté perd sa sélection automatiquement.
+
+Le GPIO21, la chauffe et l'autorisation de démarrer un test ne sont
+jamais modifiés par cette fonction.

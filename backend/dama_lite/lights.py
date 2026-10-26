@@ -46,11 +46,25 @@ class LightController:
                 self.driver[i] = value
             self.driver.show()
 
-    def update(self, states: list[str]) -> None:
+    def update(
+        self, states: list[str], *, pulse_slot: int | None = None,
+        pulse_factor: float = 1.0,
+    ) -> None:
+        if not 0.0 <= pulse_factor <= 1.0:
+            raise ValueError("Un pulse LED ne peut pas augmenter l'intensité.")
+        if pulse_slot is not None and (type(pulse_slot) is not int or not 1 <= pulse_slot <= 8):
+            raise ValueError("Groupe LED hors plage 1-8.")
         with self._lock:
             self._last = pixel_colors(states)
+            output = list(self._last)
+            # Le pulse ne remplace jamais un défaut rouge ni une analyse
+            # jaune ; il assombrit seulement la position verte choisie.
+            if pulse_slot is not None and states[pulse_slot - 1] == "available":
+                offset = (pulse_slot - 1) * 8
+                for i in range(offset, offset + 8):
+                    output[i] = tuple(int(channel * pulse_factor) for channel in output[i])
             if self._blackout_depth == 0:
-                self._write(self._last)
+                self._write(output)
 
     @property
     def blackout_active(self) -> bool:

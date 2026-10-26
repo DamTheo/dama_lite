@@ -168,6 +168,14 @@ def make_handler(service: DamaLiteService):
                 if not isinstance(body, dict):
                     self._error(400, "Corps JSON invalide.")
                     return
+                if path == "/api/selection":
+                    # Un seul champ strictement typé, jamais de modification
+                    # du chauffage ni de l'état des expériences.
+                    if set(body) != {"camera"}:
+                        raise ValueError("Corps de sélection invalide.")
+                    service.select_ui_camera(body["camera"])
+                    self._json(200, {"selected": service.ui_selected_camera()})
+                    return
                 if path == "/api/tests":
                     if service.state != "on":
                         raise CannotStart("Machine non disponible.")
@@ -205,7 +213,9 @@ def make_handler(service: DamaLiteService):
         def log_message(self, fmt: str, *args) -> None:
             # React interroge l'état chaque seconde ; éviter plusieurs
             # millions d'entrées de journal et l'usure inutile de la carte SD.
-            if self.path.startswith("/api/status") or self.path.startswith("/api/health"):
+            if (self.path.startswith("/api/status")
+                    or self.path.startswith("/api/health")
+                    or self.path.startswith("/api/selection")):
                 return
             LOG.info("%s - %s", self.address_string(), fmt % args)
 
