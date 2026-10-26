@@ -61,3 +61,22 @@ des groupes n'ont pas encore été observés directement avec une image.
 Après activation permanente, l'utilisateur devra confirmer visuellement
 l'ordre des huit segments et l'intensité. Aucun pilote ne doit réclamer
 GPIO21, et le service chauffe de production ne doit pas être démarré.
+
+
+## Installation du marqueur après autorisation explicite
+
+Le fichier modèle \`deploy/led-authorization-marker.txt\` contient uniquement
+le texte d'autorisation non secret. La seule installation dans
+\`/etc/dama-lite/leds-qualified\` se fait avec propriétaire root et
+droits 0600, puis le service systemd peut être activé. La présence
+du marqueur confirme seulement l'autorisation opérateur et le fait
+que le test LED a terminé sans erreur, pas une observation visuelle.
+
+\`\`\`bash
+cd /home/damocles/dama-lite-staging
+sudo install -o root -g root -m 600 deploy/led-authorization-marker.txt /etc/dama-lite/leds-qualified
+sudo systemctl daemon-reload
+sudo systemctl enable --now dama-lite-led-bridge.service
+\`\`\`
+
+Le relais chauffage GPIO21 et \`dama-lite.service\` restent éteints/inactifs.
