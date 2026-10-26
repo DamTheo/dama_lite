@@ -29,6 +29,7 @@ class LightController:
         self._lock = threading.RLock()
         self._blackout_depth = 0
         self._last = None
+        self._sent = None
         self.driver = driver
         if enabled and driver is None:
             import board
@@ -41,10 +42,12 @@ class LightController:
             self._write([(0, 0, 0)] * 64)
 
     def _write(self, colors: list[tuple[int, int, int]]) -> None:
-        if self.driver is not None:
-            for i, value in enumerate(colors):
+        values = tuple(colors)
+        if self.driver is not None and values != self._sent:
+            for i, value in enumerate(values):
                 self.driver[i] = value
             self.driver.show()
+            self._sent = values
 
     def update(
         self, states: list[str], *, pulse_slot: int | None = None,
