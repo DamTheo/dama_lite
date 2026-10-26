@@ -126,7 +126,7 @@ def main() -> None:
         print("Affectation mise à jour ; sauvegarde conservée : " + str(backup))
     print("CAM1=USB1.2.4, CAM3=USB1.2.2, CAM4=USB1.2.1.")
     print("CAM2=USB1.2.3 : emplacement encore à confirmer visuellement.")
-    print("CAM5–CAM8, Entra, chauffe et LED inchangés.")
+    print("CAM5-CAM8, Entra, chauffe et LED inchanges.")
 
 
 if __name__ == "__main__":
