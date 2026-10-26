@@ -76,3 +76,39 @@ sans générer artificiellement une image manquante. Si les deux essais
 
 Cette reprise logicielle ne constitue pas une solution aux erreurs physiques
 \`err=-71\` : contrôler la qualité des hubs et leur alimentation.
+
+
+## Correction du 26 octobre 2026 — reconnexions concurrentes et hub fragile
+
+Les journaux applicatifs du Pi montraient une **tempête de HTTP 503**
+sur les caméras 1 à 8 lorsque l'utilisateur changeait d'emplacement
+ou qu'une image était retardée. La version précédente rejetait tout
+deuxième client sur une même caméra, même si Chromium n'avait pas encore
+fermé l'ancienne requête. Chaque retry démarrait un nouveau FFmpeg et
+rouvrait V4L2, aggravant les dysfonctionnements USB.
+
+Le nouveau \`LivePreviewManager\` :
+- **un seul FFmpeg par caméra**, et diffusion des mêmes JPEG à plusieurs
+  clients HTTP sans décodage ni réencodage ;
+- dernier JPEG conservé temporairement et UVC laissé ouvert jusqu'à
+  **2 secondes après le départ du dernier lecteur** ;
+- retour au même emplacement quasi immédiat sans réinitialisation
+  matérielle si le délai de grâce est respecté ;
+- maximum **3 aperçus distincts concurrents** pour ne pas saturer le bus
+  USB2 lorsque plusieurs clients graphiques sont ouverts ;
+- capture scientifique PNG prioritaire, tuant le worker vidéo avant
+  de rouvrir la webcam pour une photo sans changer résolution ni timing ;
+- protection contre les processus morts ou bloqués par timeouts et
+  suppression correcte des ouvriers devenus inutiles.
+
+Les quatre caméras CAM5–CAM8 sont assignées physiquement aux ports
+\`1.1.1\`–\`1.1.4\` du hub **1-1.1 Terminus 1a40:0101**.
+Les journaux noyau du 26/10 à 10 h 51–10 h 53 prouvent plusieurs
+**déconnexions de ce hub entier**, puis réénumération des quatre UC60.
+Cela nécessite également une action sur l'alimentation et les liaisons
+physiques du hub, car du code Python ne peut pas garantir la stabilité
+d'un hub qui se déconnecte du noyau Linux.
+
+Le banc d'essai logiciel doit être revalidé après déploiement, caméra
+par caméra puis sur plusieurs heures. Aucun lancement expérimental
+n'est nécessaire pour contrôler ces aperçus.
