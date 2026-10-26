@@ -2,8 +2,8 @@
 import unittest
 
 from dama_lite.led_bridge import (
-    gentle_pulse_factor, selected_available_slot, states_from_snapshot,
-    selftest, should_hold_previous,
+    PulseAnimator, StatusCache, gentle_pulse_factor,
+    selected_available_slot, states_from_snapshot, selftest, should_hold_previous,
 )
 from dama_lite.lights import LightController
 
@@ -103,6 +103,30 @@ class LedBridgeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             controller.update(["available"] * 8, pulse_slot=3, pulse_factor=1.2)
         controller.close()
+
+    def test_25hz_pulse_is_continuous_and_fades_out(self):
+        animator = PulseAnimator()
+        slot, factor = animator.frame(5, 100.0)
+        self.assertEqual((5, 1.0), (slot, factor))
+        previous = factor
+        for index in range(1, 51):
+            slot, factor = animator.frame(5, 100.0 + 0.04 * index)
+            self.assertEqual(5, slot)
+            self.assertLess(abs(factor - previous), .03)
+            previous = factor
+        slot, factor = animator.frame(None, 102.0)
+        self.assertEqual(5, slot)
+        self.assertAlmostEqual(previous, factor, delta=.02)
+        slot, factor = animator.frame(None, 102.4)
+        self.assertEqual((None, 1.0), (slot, factor))
+
+    def test_http_cache_does_not_stall_pwm_and_expires_safely(self):
+        cache = StatusCache()
+        self.assertIsNone(cache.read(100.0))
+        data = {"power": "on"}
+        cache.publish(data, 100.0)
+        self.assertIs(cache.read(102.95), data)
+        self.assertIsNone(cache.read(103.0))
 
     def test_leds_off_if_status_incomplete(self):
         self.assertEqual(["off"] * 8, states_from_snapshot({"power": "on"}))

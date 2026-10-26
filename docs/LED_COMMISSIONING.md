@@ -130,3 +130,22 @@ est effacée ; un navigateur planté perd sa sélection automatiquement.
 
 Le GPIO21, la chauffe et l'autorisation de démarrer un test ne sont
 jamais modifiés par cette fonction.
+
+
+## Correction du 26 octobre 2026 — pulsation fluide
+
+Après retour utilisateur en vidéo, le rendu de pulsation partageait
+malheureusement le même thread que \`urlopen(/api/status)\` et pouvait
+attendre jusqu'à 1,5 seconde lorsqu'une webcam ou le serveur ralentissait.
+Cela provoquait des pauses aléatoires, donnant une impression de panne.
+
+La correction sépare désormais **une lecture HTTP asynchrone**
+(~2,8 Hz) et **un rendu PWM à 25 Hz** avec phase continue
+\`time.monotonic()\`. La sélection démarre au vert plein (maximum 10 %),
+respire lentement avec période 3,6 secondes, entre 35 et 100 % de la
+consigne matérielle, et retrouve progressivement le vert normal
+en 400 ms quand l'utilisateur quitte le menu.
+Le pilote évite les transmissions inutiles si l'image RGB quantifiée
+n'a pas changé. Rouge (défaut), jaune (test) et extinction pendant
+photographie conservent leur priorité, et les LED s'éteignent en cas
+de perte durable du contrôleur local (>3 secondes).

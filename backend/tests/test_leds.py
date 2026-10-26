@@ -27,6 +27,19 @@ class LedTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "10 %"):
             LightController(False, 12, 0.11, driver=FakeStrip())
 
+    def test_unchanged_led_frame_skips_pwm_show(self):
+        strip = FakeStrip()
+        leds = LightController(False, 12, .1, driver=strip)
+        start = strip.calls
+        leds.update(["available"] * 8)
+        self.assertEqual(start + 1, strip.calls)
+        leds.update(["available"] * 8)
+        leds.update(["available"] * 8, pulse_slot=1, pulse_factor=1.0)
+        self.assertEqual(start + 1, strip.calls)
+        leds.update(["available"] * 8, pulse_slot=1, pulse_factor=0.8)
+        self.assertEqual(start + 2, strip.calls)
+        leds.close()
+
     def test_no_leds_during_photo(self):
         strip = FakeStrip()
         leds = LightController(False, 12, .1, driver=strip)
