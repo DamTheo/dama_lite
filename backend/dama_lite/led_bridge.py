@@ -17,11 +17,11 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
 
-from .lights import LightController, COLOR
+from .lights import LightController
 
 LOG = logging.getLogger(__name__)
 VALIDATION_MARKER = Path("/etc/dama-lite/leds-qualified")
-VALIDATION_TEXT = "LED_GPIO12_64_10PCT_TESTED"
+VALIDATION_TEXT = "LED_GPIO12_64_10PCT_OPERATOR_AUTHORIZED"
 STATUS_URL = "http://127.0.0.1:8765/api/status"
 
 
@@ -97,7 +97,7 @@ def main() -> None:
     if args.selftest == args.run_service:
         parser.error("Choisir un seul mode.")
     if args.run_service and not safety_confirmed():
-        parser.error("Qualification physique LED non enregistrée.")
+        parser.error("Autorisation opérateur pour les LED GPIO12 non enregistrée.")
     logging.basicConfig(level=logging.INFO)
     stopped = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stopped.set())

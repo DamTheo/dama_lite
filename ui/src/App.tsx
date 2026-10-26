@@ -8,6 +8,22 @@ import { Face, PowerOverlay } from "./Face";
 import TouchKeyboard from "./TouchKeyboard";
 import type { CameraStatus, MachineStatus, Screen, TestStatus } from "./types";
 
+function validateExperimentFolder(value: string): string | null {
+  // Même nom côté écran, SQLite et SharePoint : aucun trim silencieux.
+  if (value.trim().length === 0) {
+    return "Nom obligatoire : il devient le dossier SharePoint.";
+  }
+  if (value.length > 110) return "110 caractères maximum.";
+  if (value !== value.replace(/^[ .]+|[ .]+$/g, "")) {
+    return "Pas d'espace ni de point au début ou à la fin du nom.";
+  }
+  if (/[<>:"/\\|?*\x00-\x1f]/.test(value)
+      || ["con", "prn", "aux", "nul"].includes(value.toLowerCase())) {
+    return "Nom non compatible avec SharePoint.";
+  }
+  return null;
+}
+
 const LABELS = {
   available: "Disponible",
   running: "En cours",
@@ -133,6 +149,7 @@ export default function App() {
     selected?.led === "available" && status?.sharepoint_configured
     && status?.thermal.ready && online,
   );
+  const folderNameError = validateExperimentFolder(name);
   const isShutting = status?.power === "shutting";
   const title = useMemo(() => ({
     home: "ACCUEIL", menu: "QUE SOUHAITEZ-VOUS FAIRE ?",
@@ -141,10 +158,14 @@ export default function App() {
   }[screen]), [screen, camera]);
 
   async function launch() {
-    if (!name.trim() || !selectedReady || working) return;
+    if (folderNameError) {
+      setNotice(folderNameError);
+      return;
+    }
+    if (!selectedReady || working) return;
     setWorking(true);
     try {
-      await startTest(camera, name.trim());
+      await startTest(camera, name);
       setName("");
       setKeyboard(false);
       setScreen("tests");
@@ -283,18 +304,21 @@ export default function App() {
                   ))}
                 </div>
                 <div className="test-entry">
-                  <label htmlFor="test-name">NOM DE L'EXPÉRIENCE</label>
+                  <label htmlFor="test-name">NOM OBLIGATOIRE = DOSSIER SHAREPOINT *</label>
                   <input id="test-name" value={name} maxLength={110}
                     inputMode="none" placeholder="Ex. Ecoli_EXP_01"
+                    required aria-required="true" aria-invalid={Boolean(name && folderNameError)}
                     onFocus={() => setKeyboard(true)}
                     onChange={e => setName(e.target.value)} />
-                  <button className="action primary launch" disabled={!selectedReady || !name.trim() || working}
+                  <button className="action primary launch" disabled={!selectedReady || Boolean(folderNameError) || working}
                     onClick={() => void launch()}><Play size={20} />
                     {working ? "Préparation SharePoint..." : "Lancer l'analyse"}
                   </button>
                 </div>
                 <div className="hint-line">
-                  {status?.thermal.fault ? "Défaut thermique : lancement bloqué"
+                  {name && folderNameError ? folderNameError
+                    : !folderNameError ? "DOSSIER : DAMA-Lite / " + name
+                    : status?.thermal.fault ? "Défaut thermique : lancement bloqué"
                     : !status?.thermal.ready ? "Le lancement nécessite une enceinte à 35 °C minimum."
                       : !status.sharepoint_configured ? "SharePoint non configuré."
                         : !selected?.connected ? "Caméra non connectée."

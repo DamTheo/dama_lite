@@ -31,6 +31,24 @@ class LedBridgeTests(unittest.TestCase):
         data["thermal"]["fault"] = "DS18B20"
         self.assertEqual(["fault"] * 8, states_from_snapshot(data))
 
+    def test_per_slot_fault_and_running_colors_without_heating(self):
+        data = {
+            "power": "on",
+            "thermal": {"fault": None, "heating_enabled": False},
+            "cameras": [{
+                "slot": slot, "configured": True, "connected": True,
+                "health": "available",
+            } for slot in range(1, 9)],
+        }
+        data["cameras"][1]["health"] = "running"
+        data["cameras"][4]["health"] = "fault"
+        data["cameras"][6]["connected"] = False
+        self.assertEqual(
+            ["available", "running", "available", "available",
+             "fault", "available", "fault", "available"],
+            states_from_snapshot(data),
+        )
+
     def test_leds_off_if_status_incomplete(self):
         self.assertEqual(["off"] * 8, states_from_snapshot({"power": "on"}))
 

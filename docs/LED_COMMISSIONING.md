@@ -25,7 +25,7 @@ Aucun accès GPIO21, à la chauffe ou aux identifiants Microsoft.
 
 Après qualification, un administrateur peut créer sous contrôle local
 \`/etc/dama-lite/leds-qualified\` contenant exclusivement
-\`LED_GPIO12_64_10PCT_TESTED\`, possédé par root et non modifiable
+\`LED_GPIO12_64_10PCT_OPERATOR_AUTHORIZED\`, possédé par root et non modifiable
 par d'autres utilisateurs, puis installer et activer le service
 \`deploy/dama-lite-led-bridge.service\`. Le démarrage est refusé sans
 cette preuve de qualification, et le service n'est pas activé par défaut.
@@ -46,3 +46,18 @@ global et \`led_blackout\`. Le helper interroge l'API à 5 Hz :
 Si la communication avec l'API cesse, le helper éteint le bandeau.
 Le backend impose toujours le verrouillage du chauffage et le seuil
 de 35 °C ; les LED vertes ne valent pas autorisation de lancer un test.
+
+
+## Autorisation du 26/10/2026 et état de validation
+
+L'utilisateur a autorisé expressément l'activation des LED, tout en
+demandant que **la chauffe reste désactivée**. Le programme de test matériel
+\`dama_lite.led_bridge --selftest\` a terminé avec code 0 sur
+\`Incub-resa\` et a envoyé un ordre d'extinction à la fin du test.
+
+Le marqueur \`leds-qualified\` est désormais une **autorisation opérateur**,
+non une certification physique du bandeau. L'ordre et la couleur
+des groupes n'ont pas encore été observés directement avec une image.
+Après activation permanente, l'utilisateur devra confirmer visuellement
+l'ordre des huit segments et l'intensité. Aucun pilote ne doit réclamer
+GPIO21, et le service chauffe de production ne doit pas être démarré.

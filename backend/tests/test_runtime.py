@@ -88,6 +88,16 @@ class RuntimeTests(unittest.TestCase):
         self.store.close()
         self.tempdir.cleanup()
 
+    def test_mandatory_name_and_exact_graph_folder(self):
+        for missing in (None, "", " ", "  "):
+            with self.assertRaises(ValueError):
+                self.manager.new_test(1, missing)
+        self.assertEqual([], self.graph.names)
+        item = self.manager.new_test(1, "Colonie A - Lot 1")
+        self.assertEqual(["Colonie A - Lot 1"], self.graph.names)
+        self.assertEqual("folder-Colonie A - Lot 1", item["folder_id"])
+        self.assertEqual("Colonie A - Lot 1", item["name"])
+
     def test_heat_gate_and_exact_graph_folder(self):
         self.thermal.temp = 34.9
         with self.assertRaises(CannotStart):
