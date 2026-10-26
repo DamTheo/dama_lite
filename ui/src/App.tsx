@@ -201,7 +201,7 @@ export default function App() {
           <div className={"reading " + (status?.thermal.ready ? "ok" : "warm")}>
             <Thermometer size={17} />
             <strong>{formatTemp(status?.thermal.temperature_c ?? null)}</strong>
-            <span>{status?.thermal.heater_on ? "CHAUFFE" : status?.thermal.ready ? "PRÊT" : "ATTENTE"}</span>
+            <span>{!status?.thermal.heating_enabled ? "CHAUFFE OFF" : status.thermal.heater_on ? "CHAUFFE" : status.thermal.ready ? "PRÊT" : "ATTENTE"}</span>
           </div>
           <div className="reading counts"><Camera size={17} /><strong>{connectedCount}/8</strong><span>CAMÉRAS</span></div>
         </div>
@@ -232,7 +232,7 @@ export default function App() {
               <Face />
               <h1>DAMA Lite</h1>
               <p>{status?.thermal.ready ? "Prêt pour vos expériences" : status?.thermal.heating_enabled
-                ? "Préchauffage de l'enceinte" : "En attente de configuration"}</p>
+                ? "Préchauffage de l'enceinte" : "Chauffe désactivée · sécurité à valider"}</p>
               <span className="touch-hint">TOUCHER POUR CONTINUER</span>
             </button>
             <div className="home-stations">

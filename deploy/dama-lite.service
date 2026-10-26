@@ -10,6 +10,7 @@ Group=damocles
 SupplementaryGroups=video gpio
 WorkingDirectory=/opt/dama-lite/backend
 Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/opt/dama-lite/.venv/bin/python -m dama_lite.heat_qualification --guard --config /etc/dama-lite/config.json
 ExecStart=/opt/dama-lite/.venv/bin/python -m dama_lite --config /etc/dama-lite/config.json
 Restart=on-failure
 RestartSec=3
