@@ -52,6 +52,25 @@ class LedBridgeTests(unittest.TestCase):
             states_from_snapshot(data),
         )
 
+    def test_selection_does_not_suppress_red_or_yellow(self):
+        data = {
+            "power": "on", "ui_selected_camera": 7,
+            "thermal": {"fault": None},
+            "cameras": [
+                {"slot": n, "configured": True, "connected": True,
+                 "health": "available"} for n in range(1, 9)
+            ],
+        }
+        data["cameras"][6]["connected"] = False
+        self.assertEqual(7, selected_available_slot(
+            data, states_from_snapshot(data)
+        ))
+        data["cameras"][6]["connected"] = True
+        data["cameras"][6]["health"] = "running"
+        self.assertEqual(7, selected_available_slot(
+            data, states_from_snapshot(data)
+        ))
+
     def test_short_http_timeout_does_not_flicker_but_long_loss_goes_off(self):
         self.assertFalse(should_hold_previous(None, 10.0))
         self.assertTrue(should_hold_previous(100.0, 102.99))

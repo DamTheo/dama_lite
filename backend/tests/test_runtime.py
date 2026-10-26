@@ -112,6 +112,23 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(1, self.store.tests()[0]["pending_uploads"])
         self.assertEqual(0, self.leds.black)
 
+    def test_confirmed_poweroff_marks_tests_finished_preserving_queue(self):
+        item = self.manager.new_test(4, "RUN-AND-FINISH")
+        self.manager._capture(item["id"])
+        self.manager.stop_all(confirmed=True)
+        after = self.store.tests()[0]
+        self.assertEqual("stopped", after["state"])
+        self.assertIsNone(after["error"])
+        self.assertEqual(1, after["pending_uploads"])
+        self.assertEqual(1, self.store.pending_uploads_count())
+        self.store.checkpoint()
+
+    def test_unexpected_poweroff_marks_tests_interrupted(self):
+        item = self.manager.new_test(4, "RUN-INTERRUPTED")
+        self.manager.stop_all()
+        result = self.store.tests()[0]
+        self.assertEqual("interrupted", result["state"])
+
     def test_finish_experiment_keeps_photos_for_sharepoint_and_releases_led(self):
         item = self.manager.new_test(1, "FIN-EXP-01")
         self.assertEqual("running", self.manager.camera_health_states()[0])
