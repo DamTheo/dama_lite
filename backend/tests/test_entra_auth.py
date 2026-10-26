@@ -76,10 +76,16 @@ class GraphEnvOauthTests(unittest.TestCase):
             reply.json.return_value = {
                 "access_token": "token-test", "expires_in": 3600
             }
-            with patch("requests.post", return_value=reply) as request:
+            # Le CI minimal ne dépend pas de requests ; simuler seulement
+            # le transport HTTP et vérifier le contrat des données.
+            requests_module = types.ModuleType("requests")
+            requests_module.RequestException = RuntimeError
+            requests_module.post = MagicMock(return_value=reply)
+            with patch.dict(sys.modules, {"requests": requests_module}):
                 client = SharePointClient(cfg)
                 self.assertEqual("token-test", client._token())
                 self.assertEqual("token-test", client._token())
+            request = requests_module.post
             self.assertEqual(1, request.call_count)
             self.assertEqual(
                 "private-test-value",
