@@ -139,3 +139,30 @@ ports aval doit être établie : quatre webcams par hub peuvent entraîner
 des besoins en courant élevés et des resets si la distribution est
 insuffisante. Le Pi indique \`throttled=0x0\`, ce qui n'exclut pas
 une chute de tension localisée dans un hub.
+
+
+## Suppression des microcoupures logicielles (26/10/2026, V2)
+
+Une seconde revue du backend a identifié un mécanisme interne de perte
+d'images : les huit webcams UC60 transmettent un MJPEG natif demandé
+à **10 images/s**, mais le relais Python refusait une nouvelle image
+moins de **120 ms après la précédente**. Comme deux images normales
+peuvent être espacées de 100 ms, environ une image sur deux était
+rejetée, ce qui explique les **5–6 i/s mesurées malgré une source 10 Hz**.
+
+Le filtre de 120 ms est supprimé. Le worker garde en mémoire la
+**dernière image JPEG complète**, sans file persistante et sans jamais
+fabriquer d'image. Les lecteurs HTTP suivent le flux dans la limite
+de leur capacité ; si Chromium prend du retard, ils récupèrent la plus
+récente au lieu de bloquer le Pi. Le débit USB reste limité à **10 i/s**
+par FFmpeg : cette correction ne hausse ni la résolution ni le débit
+demandé au périphérique, ce qui protège le hub fragile.
+Le timeout de gel passe de 7 à 5 secondes.
+
+Attention : \`640×480\` est le mode UVC natif choisi pour garder
+l'aperçu léger ; les photos scientifiques sont enregistrées en
+\`1280×720\`. L'interface CSS utilise \`object-fit:contain\` et
+n'effectue aucun recadrage, mais **l'angle de champ UVC peut différer**
+entre ces deux modes. Si la plainte désigne un recadrage et non des
+saccades, il faudra qualifier une prévisualisation plein champ 16:9
+sans dégrader la stabilité USB du hub secondaire.

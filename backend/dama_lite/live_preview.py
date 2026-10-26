@@ -24,8 +24,12 @@ LOG = logging.getLogger(__name__)
 SOI = b"\xff\xd8"
 EOI = b"\xff\xd9"
 MAX_FRAME_BYTES = 3 * 1024 * 1024
-FRAME_INTERVAL_S = 0.12
-STALL_TIMEOUT_S = 7.0
+# Les UC60 sont déjà configurées à 10 images/s dans FFmpeg.
+# Ne pas jeter arbitrairement une image sur deux sur le Pi : le client
+# partage la dernière image complète, sans file susceptible d'accumuler
+# du retard. Le cap USB reste 10 Hz, le débit matériel n'augmente pas.
+FRAME_INTERVAL_S = 0.0
+STALL_TIMEOUT_S = 5.0
 WARM_IDLE_S = 2.0
 MAX_PARALLEL_PREVIEWS = 3  # Éviter huit flux vidéo concurrents sur un bus USB2.
 
@@ -197,8 +201,6 @@ class LivePreviewManager:
         error = None
         parser = JpegParser()
         last_received = time.monotonic()
-        last_sent = 0.0
-        first_received = None
         total_frames = 0
         stdout = session.proc.stdout
         try:
@@ -229,18 +231,19 @@ class LivePreviewManager:
                         now = time.monotonic()
                         last_received = now
                         total_frames += 1
-                        if first_received is None:
-                            first_received = now
-                        if now - last_sent >= FRAME_INTERVAL_S:
-                            with session.condition:
-                                session.last_frame = frame
-                                session.frame_at = now
-                                session.seq += 1
-                                session.condition.notify_all()
-                            last_sent = now
+                        # Toute image MJPEG valide a sa chance d'être
+                        # affichée ; l'ancien filtre temporel de 120 ms
+                        # écartait ~40 % des images d'une source à 10 Hz.
+                        # Les lecteurs lents sautent naturellement les
+                        # anciennes images, pas les plus récentes.
+                        with session.condition:
+                            session.last_frame = frame
+                            session.frame_at = now
+                            session.seq += 1
+                            session.condition.notify_all()
                 if time.monotonic() - last_received > STALL_TIMEOUT_S:
                     raise LivePreviewError(
-                        f"Caméra {slot} : aucune image USB depuis 7 secondes."
+                        f"Caméra {slot} : aucune image USB depuis 5 secondes."
                     )
         except (OSError, ValueError, LivePreviewError) as exc:
             if not session.stop.is_set():

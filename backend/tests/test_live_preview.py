@@ -1,5 +1,8 @@
 import unittest
-from dama_lite.live_preview import JpegParser, LivePreviewManager, MAX_FRAME_BYTES
+from dama_lite.live_preview import (
+    FRAME_INTERVAL_S, JpegParser, LivePreviewManager, MAX_FRAME_BYTES,
+    STALL_TIMEOUT_S,
+)
 
 
 class ParserTests(unittest.TestCase):
@@ -22,6 +25,14 @@ class ParserTests(unittest.TestCase):
         self.assertIn("mjpeg", command)
         self.assertEqual("copy", command[command.index("-c:v") + 1])
         self.assertEqual("pipe:1", command[-1])
+
+    def test_all_native_ten_fps_frames_can_pass_without_artificial_drop(self):
+        # L'entrée FFmpeg limite déjà la cadence à 10 i/s : le worker ne
+        # doit pas jeter une image sur deux avant diffusion aux clients.
+        self.assertEqual(0.0, FRAME_INTERVAL_S)
+        self.assertLessEqual(STALL_TIMEOUT_S, 5.0)
+        command = LivePreviewManager.ffmpeg_command("/dev/v4l/by-path/video0")
+        self.assertEqual("10", command[command.index("-framerate") + 1])
 
     def test_photo_slot_releases_after_completion(self):
         preview = LivePreviewManager()
