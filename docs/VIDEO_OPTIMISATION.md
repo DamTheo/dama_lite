@@ -173,3 +173,30 @@ n'effectue aucun recadrage, mais **l'angle de champ UVC peut différer**
 entre ces deux modes. Si la plainte désigne un recadrage et non des
 saccades, il faudra qualifier une prévisualisation plein champ 16:9
 sans dégrader la stabilité USB du hub secondaire.
+
+
+## Cadrage du bas de l'image sur le tactile 7" (26 octobre 2026)
+
+Retour utilisateur : vidéo désormais fluide, mais bas de l'image tronqué.
+
+Le CSS plaçait le MJPEG 640x480 comme élément intrinsèque dans une grille
+dont la taille verticale est limitée par les 800x480 px de l'écran.
+Même avec \`object-fit:contain\`, la taille de la boîte CSS de l'image
+pouvait dépasser celle de son parent, tandis que \`overflow:hidden\`
+masquait les derniers pixels en bas.
+
+Les deux vues (« Nouvelle analyse » et « Visualiser une caméra »)
+affichent maintenant les JPEG avec une image positionnée absolument
+dans un cadre flexible de taille bornée :
+\`position:absolute; inset:0; width:100%; height:100%; object-fit:contain;
+object-position:center\`. La grille n'est plus agrandie par la dimension
+intrinsèque de l'image. Si le rapport du JPEG ne correspond pas à celui
+du cadre, il y aura des bandes noires plutôt qu'un rognage.
+
+Un script Node sans dépendances vérifie le contrat CSS avant chaque build.
+La capture scientifique PNG 1280x720, le flux UVC 640x480, la cadence
+d'acquisition et la chauffe sont inchangés.
+
+Limite : cette correction évite la perte de pixels liée au navigateur ;
+elle ne restitue pas les informations absentes de l'image UVC source
+ou dissimulées par un objet devant la caméra.

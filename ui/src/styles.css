@@ -150,12 +150,14 @@ svg { flex-shrink: 0; }
 .setup-visualization { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1fr) 198px; gap: 10px; min-height: 0; }
 .new-screen .setup-visualization .tiles-grid { min-height: 0; max-height: none; }
 .new-screen .camera-tile { gap: 5px; }
-.setup-preview { background: #14161a; border: 1px solid #3e4147; border-radius: 11px; min-width: 0; min-height: 0; padding: 7px; display: flex; flex-direction: column; gap: 6px; }
+.setup-preview { background: #14161a; border: 1px solid #3e4147; border-radius: 11px; min-width: 0; min-height: 0; padding: 7px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px; overflow: hidden; }
 .setup-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 4px; font-size: 9px; }
 .setup-preview-heading strong { color: var(--yellow); font-size: 13px; }
 .setup-preview-heading span { color: var(--muted); letter-spacing: .06em; }
-.setup-preview-frame { position: relative; display: grid; place-items: center; flex: 1; min-height: 65px; overflow: hidden; background: #050505; border: 1px solid #33353a; border-radius: 7px; }
-.setup-preview-frame img { width: 100%; height: 100%; object-fit: contain; }
+/* Le MJPEG 4:3 et l'ecran tactile ont des rapports differents. Sortir l'image
+   du calcul intrinsèque de grille evite qu'elle dépasse par le bas. */
+.setup-preview-frame { position: relative; display: block; min-width: 0; min-height: 0; overflow: hidden; background: #050505; border: 1px solid #33353a; border-radius: 7px; }
+.setup-preview-frame img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; object-position: center; background: #050505; }
 .setup-preview-empty { color: #afb0b7; font-size: 10px; text-align: center; }
 .setup-preview-warning { position: absolute; bottom: 0; left: 0; right: 0; background: #502b2be5; padding: 4px; text-align: center; font-size: 10px; }
 .setup-preview small { color: #aeb1b8; line-height: 1.2; font-size: 10px; text-align: center; }
@@ -166,8 +168,9 @@ svg { flex-shrink: 0; }
 .hint-line { flex: 0 0 22px; color: #aeb0b7; font-size: 11px; }
 .cameras-screen { padding: 13px 0; flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 12px; }
 .camera-screen { display: grid; grid-template-columns: minmax(0, 1fr) 205px; gap: 16px; flex: 1; min-height: 0; padding: 11px 0 0; }
-.preview-frame { background: #050505; border: 1px solid #393b41; border-radius: 11px; display: grid; place-items: center; overflow: hidden; position: relative; min-height: 0; }
-.preview-frame img { width: 100%; height: 100%; object-fit: contain; }
+/* Le flux 640x480 ne doit pas agrandir la ligne de grille au-dela de l'ecran 800x480. */
+.preview-frame { background: #050505; border: 1px solid #393b41; border-radius: 11px; display: block; overflow: hidden; position: relative; min-width: 0; min-height: 0; }
+.preview-frame img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; object-position: center; background: #050505; }
 .empty-preview { display: flex; align-items: center; flex-direction: column; color: #898b92; gap: 10px; }
 .preview-error { position: absolute; background: #57252bd9; color: #ffd3d6; padding: 8px 12px; bottom: 0; left: 0; right: 0; text-align: center; font-size: 12px; }
 .camera-info { display: flex; flex-direction: column; gap: 12px; padding: 10px 0; min-height: 0; }
