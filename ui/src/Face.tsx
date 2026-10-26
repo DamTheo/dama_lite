@@ -3,8 +3,9 @@ import type { ReactNode } from "react";
 export function Face({ sleeping = false }: { sleeping?: boolean }) {
   return (
     <div className={"dama-face" + (sleeping ? " is-sleeping" : "")} aria-hidden="true">
+      {sleeping && <div className="face-zzz"><span>z</span><span>z</span><span>Z</span></div>}
       <div className="face-eyes"><span className="face-eye" /><span className="face-eye" /></div>
-      <svg className="face-smile" viewBox="0 0 100 36">
+      <svg className="face-smile" viewBox="0 0 100 36" aria-hidden="true">
         <path d="M 12 8 Q 50 46 88 8" />
       </svg>
     </div>

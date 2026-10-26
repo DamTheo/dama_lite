@@ -54,14 +54,59 @@ svg { flex-shrink: 0; }
 .face-card h1 { color: var(--yellow); font-size: clamp(24px, 3vw, 36px); margin: 13px 0 0; line-height: 1.12; font-weight: 700; letter-spacing: .015em; }
 .face-card p { margin: 8px 5px 0; font-size: 13px; font-weight: 400; color: #b5b7bc; }
 .touch-hint { margin-top: 18px; font-size: 10px; letter-spacing: .18em; font-weight: 700; color: var(--yellow); }
-.dama-face { width: min(38vh, 270px); display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
-.face-eyes { display: flex; justify-content: space-between; width: 100%; padding: 0 8%; animation: look 11s ease-in-out infinite; }
-.face-eye { display: block; width: 27%; aspect-ratio: 1; border-radius: 50%; border: clamp(5px, .9vw, 9px) solid var(--yellow); animation: blink 7s ease-in-out infinite; transform-origin: center; backface-visibility: hidden; }
+.dama-face {
+  /* Reprise fidèle des proportions du compagnon DAMA : deux grands yeux
+     et un sourire court, respirant ensemble. Agrandi pour le 7" 800x480. */
+  width: min(52vh, 236px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+  animation: dama-breathe 5.6s ease-in-out infinite;
+  transform-origin: center 62%;
+}
+.face-eyes {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 7%;
+  animation: dama-look 11s ease-in-out infinite;
+}
+.face-eye {
+  display: block;
+  width: 27%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: clamp(6px, 1.1vw, 9px) solid var(--yellow);
+  animation: dama-blink 7s ease-in-out infinite;
+  transform-origin: center;
+  backface-visibility: hidden;
+}
 .face-eye:nth-child(2) { animation-delay: .04s; }
-.face-smile { width: 35%; height: auto; margin: 10px auto 0; overflow: visible; }
+.face-smile { width: 27%; height: auto; margin: 12px auto 0; overflow: visible; }
 .face-smile path { stroke: #f1f0eb; stroke-width: 5; stroke-linecap: round; fill: none; }
-@keyframes look { 0%,18%,80%,100% { transform: translateX(0); } 30%,40% { transform: translateX(-4%); } 55%,65% { transform: translateX(4%); } }
-@keyframes blink { 0%,43%,47%,100% { transform: scaleY(1); } 45% { transform: scaleY(.08); } }
+@keyframes dama-breathe {
+  0%,100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2px) scale(1.018); }
+}
+@keyframes dama-look {
+  0%,20%,45%,100% { transform: translateX(0); }
+  25%,35% { transform: translateX(7px); }
+  65%,78% { transform: translateX(-6px); }
+}
+@keyframes dama-blink {
+  0%,43%,47%,100% { transform: scaleY(1); }
+  45% { transform: scaleY(.08); }
+}
+.face-card:active .dama-face { animation: none; transform: translateY(-4px) scale(1.04); }
+.face-zzz { position: absolute; right: -8px; top: -25px; color: var(--yellow); pointer-events: none; }
+.face-zzz span { position: absolute; opacity: 0; animation: dama-z 4.5s ease-in infinite; }
+.face-zzz span:nth-child(1) { animation-delay: 0s; font-size: 15px; }
+.face-zzz span:nth-child(2) { animation-delay: 1.5s; font-size: 21px; }
+.face-zzz span:nth-child(3) { animation-delay: 3s; font-size: 27px; }
+@keyframes dama-z { 0% { opacity: 0; transform: translate(0, 20px); } 20% { opacity: .9; } 100% { opacity: 0; transform: translate(34px, -50px); } }
+/* DAMA source: animations regroupées ci-dessus (dama-look, dama-blink). */
 .is-sleeping .face-eye { animation: none; transform: scaleY(.12); }
 .home-stations { min-width: 0; display: flex; flex-direction: column; padding: 10px 5px 0 2px; gap: 11px; }
 .section-caption { display: flex; align-items: center; justify-content: space-between; margin: 0; color: #a6a7ab; font-size: 11px; letter-spacing: .16em; font-weight: 700; }
@@ -211,9 +256,9 @@ svg { flex-shrink: 0; }
   .machine-footer { flex-basis: 24px; height: 24px; }
   .face-card p { margin-top: 5px; font-size: 11px; }
   .face-card h1 { margin-top: 7px; }
-  .face-card .dama-face { width: min(33vh, 190px); }
+  .face-card .dama-face { width: min(49vh, 230px); }
   .page-heading { flex-basis: 37px; }
-  .menu-screen > .dama-face { width: min(31vh, 185px); }
+  .menu-screen > .dama-face { width: min(44vh, 210px); }
   .action { min-height: 48px; }
   .menu-options { gap: 10px; }
   .new-screen { gap: 6px; padding-top: 7px; }
@@ -236,7 +281,7 @@ svg { flex-shrink: 0; }
   .test-row .stop-btn { grid-column: 3; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .face-eyes, .face-eye { animation: none !important; }
+  .dama-face, .face-eyes, .face-eye, .face-zzz span { animation: none !important; }
 }
 
 /* Historique compact, conservé après reboot et visible sans réseau */
