@@ -29,6 +29,29 @@ class CameraTests(unittest.TestCase):
         self.assertIn("MJPG", args)
         self.assertEqual(15, runner.call_args.kwargs["timeout"])
 
+    def test_scientific_photo_retries_once_after_transient_uvc_error(self):
+        self.driver.ready = lambda slot: True
+        failure = SimpleNamespace(returncode=2, stdout=b"", stderr=b"USB busy")
+        success = SimpleNamespace(
+            returncode=0, stdout=b"\x89PNG\r\n\x1a\nvalid", stderr=b""
+        )
+        with patch("dama_lite.cameras.subprocess.run",
+                   side_effect=[failure, success]) as worker:
+            with patch("dama_lite.cameras.time.sleep") as delay:
+                photo = self.driver.photo(1)
+        self.assertTrue(photo.startswith(b"\x89PNG"))
+        self.assertEqual(2, worker.call_count)
+        delay.assert_called_once_with(0.75)
+
+    def test_scientific_photo_reports_permanent_usb_failure(self):
+        self.driver.ready = lambda slot: True
+        failure = SimpleNamespace(returncode=2, stdout=b"", stderr=b"USB reset")
+        with patch("dama_lite.cameras.subprocess.run", return_value=failure) as worker:
+            with patch("dama_lite.cameras.time.sleep"):
+                with self.assertRaisesRegex(CameraError, "USB reset"):
+                    self.driver.photo(1)
+        self.assertEqual(2, worker.call_count)
+
     def test_native_hang_isolation(self):
         self.driver.ready = lambda slot: True
         with patch("dama_lite.cameras.subprocess.run",

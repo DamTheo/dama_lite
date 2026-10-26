@@ -10,6 +10,7 @@ import logging
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from contextlib import contextmanager
 
@@ -96,7 +97,21 @@ class CameraController:
         except LivePreviewError as exc:
             raise CameraError(str(exc)) from exc
         try:
-            return self._capture(slot, preview=False)
+            # Deux essais maximum face aux erreurs UVC transitoires, sans
+            # remplacer une photo manquante par une fausse mesure. Si les
+            # deux acquisitions échouent, SessionManager signale le défaut.
+            for attempt in range(2):
+                try:
+                    return self._capture(slot, preview=False)
+                except CameraError as exc:
+                    if attempt == 1:
+                        raise
+                    LOG.warning(
+                        "Photo UVC caméra %s : premier essai interrompu (%s), "
+                        "une nouvelle acquisition sera tentée.", slot, exc
+                    )
+                    time.sleep(0.75)
+            raise CameraError(f"Caméra {slot} : image indisponible.")
         finally:
             self._live.resume_after_photo(slot)
 

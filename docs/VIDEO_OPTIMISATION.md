@@ -59,3 +59,20 @@ Le diagnostic conserve uniquement les durées et la taille du PNG en
 mémoire ; aucune image n'est envoyée à SharePoint ni déposée sur disque.
 Il vérifie la préemption du flux MJPEG, l'acquisition PNG et la reprise
 de l'aperçu. Ne pas lancer pendant une expérience en cours.
+
+
+## Gestion des erreurs UVC transitoires (26/10/2026)
+
+Un essai de capture scientifique sur huit webcams a confirmé des PNG 1280×720
+valides sur CAM4–CAM8, mais l'ouverture initiale MJPEG de CAM3 a rencontré
+une fermeture de flux. Le noyau signale au même moment des réinitialisations
+de la cascade USB \`1-1.1\`.
+
+Le contrôleur permet désormais **une seconde tentative explicite**
+d'acquisition PNG, espacée de 750 ms après un échec UVC. Il enregistre
+toujours **une seule photographie valide** (et son horodatage réel),
+sans générer artificiellement une image manquante. Si les deux essais
+échouent, le défaut est remonté à la session pour arrêt sûr et diagnostic.
+
+Cette reprise logicielle ne constitue pas une solution aux erreurs physiques
+\`err=-71\` : contrôler la qualité des hubs et leur alimentation.
