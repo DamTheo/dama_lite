@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from .config import SharePointConfig
+from .entra_env import read_graph_env
 
 LOG = logging.getLogger(__name__)
 BASE = "https://graph.microsoft.com/v1.0"
@@ -53,7 +54,13 @@ class SharePointClient:
             if self._app is None:
                 from msal import ConfidentialClientApplication
 
-                if self.cfg.client_secret_path:
+                if self.cfg.graph_env_path:
+                    # Le secret existant reste dans le fichier 0600 du Pi.
+                    # Ne jamais le recopier dans le JSON ou la télémétrie.
+                    credential = read_graph_env(
+                        self.cfg.graph_env_path
+                    )["MS_CLIENT_SECRET"]
+                elif self.cfg.client_secret_path:
                     # La valeur du secret n'est jamais présente en JSON,
                     # argument CLI, URL, log ni Git. Seul son chemin est configuré.
                     secret_file = Path(self.cfg.client_secret_path)
@@ -140,16 +147,40 @@ class SharePointClient:
                 )
             self._drive_verified = True
 
-    def reserve_folder(self, name: str) -> tuple[str, str | None]:
-        name = validate_test_name(name)
+    def _resolve_root_folder(self) -> dict:
         self._verify_drive()
         root = quote(self.cfg.folder_root, safe="/")
         drive = quote(self.cfg.drive_id, safe="")
-        root_item = self._request(
+        item = self._request(
             "GET", f"{BASE}/drives/{drive}/root:/{root}"
         )
-        if not root_item.get("id"):
+        if not item.get("id"):
             raise SharePointError("Dossier DAMA-Lite introuvable dans SharePoint.")
+        if item.get("name") and item["name"] != "DAMA-Lite":
+            raise SharePointError("Le dossier Graph cible n'est pas DAMA-Lite.")
+        if self.cfg.graph_folder_id and item["id"] != self.cfg.graph_folder_id:
+            raise SharePointError(
+                "Le dossier Graph ne correspond pas à MS_FOLDER_ID : "
+                "aucune écriture n'est autorisée."
+            )
+        return item
+
+    def verify_read_only(self) -> dict[str, str | bool]:
+        """Authentifie et valide le chemin exact sans aucune création."""
+        root_item = self._resolve_root_folder()
+        return {
+            "drive_verified": True,
+            "folder_name": root_item.get("name", "DAMA-Lite"),
+            "folder_matches_env": (
+                not self.cfg.graph_folder_id
+                or root_item["id"] == self.cfg.graph_folder_id
+            ),
+        }
+
+    def reserve_folder(self, name: str) -> tuple[str, str | None]:
+        name = validate_test_name(name)
+        root_item = self._resolve_root_folder()
+        drive = quote(self.cfg.drive_id, safe="")
         result = self._request(
             "POST",
             f"{BASE}/drives/{drive}/items/{quote(root_item['id'], safe='')}/children",

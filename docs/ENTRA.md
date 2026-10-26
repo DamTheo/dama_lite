@@ -1,58 +1,26 @@
-# Microsoft Entra — intégration future (en attente des identifiants)
+undefined
 
-**Aucun identifiant client ni secret n'est stocké dans Git.**
-Le dossier cible est \`R&D Biologie/03_Projets/04_Résazurine/
-03_Expérimentations & Résultats/DAMA-Lite/<Nom_test>\`.
-Un dossier est créé directement par test, sans dossier par caméra.
+## Identifiants déjà déployés (audit du 26 octobre 2026)
 
-## Application Entra
+Sur Incub-resa, le fichier privé \`/etc/dama-lite/graph.env\` existe, mode
+\`0600\`, avec les cinq variables **non vides** :
+\`MS_TENANT_ID\`, \`MS_CLIENT_ID\`, \`MS_CLIENT_SECRET\`,
+\`MS_DRIVE_ID\`, \`MS_FOLDER_ID\`.
 
-1. Créer une **inscription d'application** dédiée à DAMA Lite,
-   en tenant unique.
-2. Noter l'**ID de locataire** (\`tenant_id\`) et l'**ID de l'application**
-   (\`client_id\`) : ce sont des identifiants, pas des secrets.
-3. Choisir **un seul** mode d'authentification :
-   - **Recommandé pour équipement long terme** : certificat X.509,
-     avec clé privée et certificat public stockés dans le répertoire
-     sécurisé du Pi ; renouveler avant expiration.
-   - **Alternative** : secret client Entra stocké exclusivement dans
-     \`/etc/dama-lite/secrets/entra-client-secret\`, avec chmod 600,
-     en local sur le Pi. Le JSON contient seulement
-     \`client_secret_path\`, **jamais la valeur du secret**.
-4. Configurer le périmètre de permissions Microsoft Graph le plus limité
-   possible pour les écritures requises. Privilégier un modèle
-   \`Sites.Selected\` avec attribution ciblée au site Intranet et droits
-   nécessaires à la création de sous-dossiers et au téléversement. Faire
-   confirmer cette politique et les permissions effectives par l'admin
-   Microsoft 365 ; une attribution applicative incorrecte provoquera
-   des HTTP 403, ce qui doit bloquer l'analyse sans perdre de photos.
-5. Renseigner l'ID de la bibliothèque **R&D Biologie** (\`drive_id\`),
-   pas celui de OneDrive ou Documents. Le backend vérifie le nom exact
-   de la bibliothèque avant de créer un dossier de test.
+Pour éviter de demander une seconde fois le secret, le backend supporte
+désormais dans la section SharePoint du JSON **uniquement le chemin** :
 
-## Configuration locale (non publiée)
+\`\`\`json
+{"graph_env_path":"/etc/dama-lite/graph.env"}
+\`\`\`
 
-Mode secret : \`/etc/dama-lite/config.json\` doit contenir
-les ID non secrets, \`client_secret_path\` vers le fichier de
-valeur secrète, \`private_key_path=""\`, \`public_cert_path=""\`.
-Mode certificat : fournir les deux chemins PEM et
-\`client_secret_path=""\`.
+Le logiciel charge en mémoire les identifiants, conserve le secret
+exclusivement dans ce fichier privé et **vérifie avant tout POST** que
+l'ID de dossier reçu pour le chemin exact \`DAMA-Lite\` correspond à
+\`MS_FOLDER_ID\`. Aucune variable secrète n'est ajoutée à Git, au
+fichier JSON, à l'URL du navigateur ou aux journaux.
 
-Ne jamais envoyer la valeur d'un secret en message de discussion, dans
-un fichier Github ou dans un journal. Si le secret a été exposé,
-le révoquer dans Entra et en générer un autre.
-
-## Vérifications avant la première expérience
-
-- Résolution de l'ID de lecteur Microsoft Graph comme **R&D Biologie**.
-- Dossier \`DAMA-Lite\` trouvé à son chemin exact.
-- Consentement effectif, permissions minimales, authentification.
-- Création d'un **dossier test unique** puis téléversement d'une
-  image explicitement marquée « vérification » ; contrôle du nom et
-  du chemin SharePoint avant passage en production.
-- Recherche d'un nom déjà utilisé : l'application doit refuser
-  tout doublon, sans renommer l'expérience silencieusement.
-
-Microsoft Entra n'est pas encore configuré sur Incub-resa, ce qui est
-normal à ce jalon. Le service \`dama-lite-staging.service\` continue de
-fonctionner sans Graph, ni chauffe ni LED.
+Le contrôle de préproduction \`SharePointClient.verify_read_only()\`
+effectue seulement les GET du lecteur \`R&D Biologie\` et du dossier
+exact et ne crée ni test, ni photo. Le service staging peut activer
+SharePoint indépendamment de la chauffe et des LED.

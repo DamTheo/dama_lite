@@ -25,7 +25,7 @@ class FakeGraph(SharePointClient):
         if url.endswith("/drives/drive-rd"):
             return {"name": self.drive_name}
         if method == "GET":
-            return {"id": "DAMA_LITE_ROOT"}
+            return {"id": "DAMA_LITE_ROOT", "name": "DAMA-Lite"}
         if method == "POST":
             if json_body["@microsoft.graph.conflictBehavior"] != "fail":
                 raise AssertionError("Le nom du dossier doit rester EXACT.")
@@ -54,6 +54,20 @@ class GraphContractTests(unittest.TestCase):
         self.assertEqual(4, len(g.calls))  # Drive vérifié une fois seulement.
         self.assertIn("TEST_FOLDER:/photo.png:/content", g.calls[3][1])
         self.assertEqual(b"\x89PNG\r\n\x1a\n", g.calls[3][3])
+
+    def test_graph_env_folder_id_must_match_exact_target(self):
+        g = FakeGraph()
+        from dataclasses import replace
+        g.cfg = replace(g.cfg, graph_folder_id="ANOTHER_FOLDER")
+        with self.assertRaisesRegex(SharePointError, "MS_FOLDER_ID"):
+            g.reserve_folder("AnyTest")
+        self.assertEqual(["GET", "GET"], [c[0] for c in g.calls])
+
+    def test_readonly_verify_creates_no_dossier(self):
+        g = FakeGraph()
+        result = g.verify_read_only()
+        self.assertEqual("DAMA-Lite", result["folder_name"])
+        self.assertEqual(["GET", "GET"], [c[0] for c in g.calls])
 
     def test_wrong_library_is_refused_before_test_folder(self):
         g = FakeGraph()

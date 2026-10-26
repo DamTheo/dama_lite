@@ -44,6 +44,8 @@ class SharePointConfig:
     private_key_path: str = ""
     public_cert_path: str = ""
     client_secret_path: str = ""
+    graph_env_path: str = ""
+    graph_folder_id: str = ""
     folder_root: str = SHAREPOINT_ROOT
     expected_drive_name: str = "R&D Biologie"
 
@@ -52,10 +54,14 @@ class SharePointConfig:
         common = all([self.tenant_id, self.client_id, self.drive_id])
         certificate = bool(self.private_key_path and self.public_cert_path)
         client_secret = bool(self.client_secret_path)
-        return bool(common and (certificate or client_secret))
+        return bool(common and (certificate or client_secret or self.graph_env_path))
 
     def __post_init__(self):
         certificate = bool(self.private_key_path or self.public_cert_path)
+        if self.graph_env_path and (certificate or self.client_secret_path):
+            raise ConfigError("Entra : fichier existant OU certificat/secret séparé.")
+        if self.graph_env_path and not Path(self.graph_env_path).is_absolute():
+            raise ConfigError("Le fichier Entra exige un chemin absolu.")
         if self.client_secret_path and certificate:
             raise ConfigError(
                 "Entra : choisir certificat OU secret client, jamais les deux."
@@ -118,7 +124,23 @@ class Config:
         devices = [c.device for c in cameras if c.device]
         if len(devices) != len(set(devices)):
             raise ConfigError("Deux emplacements ne peuvent pas utiliser le même périphérique USB.")
-        sp = SharePointConfig(**raw.get("sharepoint", {}))
+        sp_raw = dict(raw.get("sharepoint", {}))
+        if sp_raw.get("graph_env_path"):
+            from .entra_env import read_graph_env
+
+            env_data = read_graph_env(sp_raw["graph_env_path"])
+            for prop, key in (
+                ("tenant_id", "MS_TENANT_ID"),
+                ("client_id", "MS_CLIENT_ID"),
+                ("drive_id", "MS_DRIVE_ID"),
+            ):
+                if sp_raw.get(prop) and sp_raw[prop] != env_data[key]:
+                    raise ConfigError(
+                        f"Identifiant {prop} incohérent avec le fichier Entra."
+                    )
+                sp_raw[prop] = env_data[key]
+            sp_raw["graph_folder_id"] = env_data.get("MS_FOLDER_ID", "")
+        sp = SharePointConfig(**sp_raw)
         c = cls(
             host=raw.get("host", "127.0.0.1"),
             port=int(raw.get("port", 8765)),
