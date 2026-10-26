@@ -142,31 +142,42 @@ class SessionManager:
                 )
             return items
 
-    def led_states(self) -> list[str]:
-        state = self.thermal.snapshot()
-        slots = {s["camera_slot"]: s for s in self.store.tests(limit=100000)
-                 if s["state"] == "running"}
-        # Un défaut sur la dernière session de ce slot reste visible jusqu'au
-        # prochain test / acquittement ; une caméra absente est un défaut si configurée.
+    def camera_health_states(self) -> list[str]:
+        """État UVC réel, indépendant de la chauffe et de SharePoint.
+
+        Un défaut thermique global peut mettre toutes les LED matérielles en
+        rouge pour la sécurité, mais ce n'est PAS une panne de huit webcams.
+        """
+        slots = {s["camera_slot"] for s in self.store.running()}
         faults = {slot for slot in range(1, 9) if self.store.needs_ack(slot)}
         upload_faults = self.store.upload_problem_slots()
-        result = []
+        result: list[str] = []
         for slot in range(1, 9):
-            if state["fault"] and self.cameras.specs[slot].device:
+            camera = self.cameras.specs[slot]
+            if camera.device and not self.cameras.ready(slot):
                 result.append("fault")
-            elif slot in upload_faults:
+            elif slot in upload_faults or slot in faults:
                 result.append("fault")
             elif slot in slots or slot in self._reserving_slots:
                 result.append("running")
-            elif slot in faults:
-                result.append("fault")
-            elif self.cameras.specs[slot].device and not self.cameras.ready(slot):
-                result.append("fault")
-            elif self.cameras.ready(slot) and state["ready"]:
+            elif self.cameras.ready(slot):
                 result.append("available")
             else:
                 result.append("off")
         return result
+
+    def led_states(self) -> list[str]:
+        """Signalisation de sécurité machine, distincte du diagnostic caméra."""
+        thermal = self.thermal.snapshot()
+        health = self.camera_health_states()
+        if thermal["fault"]:
+            return [
+                "fault" if self.cameras.specs[slot].device else "off"
+                for slot in range(1, 9)
+            ]
+        if not thermal["ready"]:
+            return ["off" if state == "available" else state for state in health]
+        return health
 
     def _loop(self) -> None:
         while not self._stop.wait(0.5):

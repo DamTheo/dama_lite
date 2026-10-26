@@ -16,6 +16,7 @@ export interface CameraStatus {
   configured: boolean;
   connected: boolean;
   led: LedState;
+  health: LedState;
   active_test: string | null;
 }
 export interface TestStatus {

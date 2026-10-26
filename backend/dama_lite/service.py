@@ -60,12 +60,14 @@ class DamaLiteService:
         thermo = self.thermal.snapshot()
         items = self.sessions.overview()
         states = self.sessions.led_states()
+        health = self.sessions.camera_health_states()
         return {
             "power": self.state,
             "thermal": thermo,
             "cameras": [
                 {"slot": i, "configured": bool(self.cameras.specs[i].device),
-                 "connected": self.cameras.ready(i), "led": states[i - 1],
+                 "connected": self.cameras.ready(i),
+                 "led": states[i - 1], "health": health[i - 1],
                  "active_test": next(
                      (t["id"] for t in items
                       if t["camera_slot"] == i and t["state"] == "running"), None

@@ -28,10 +28,11 @@ def settings(root: Path):
 class FakeThermal:
     def __init__(self, temp=35):
         self.temp = temp
+        self.fault = None
 
     def snapshot(self):
         return {"ready": self.temp >= 35, "temperature_c": self.temp,
-                "cpu_temperature_c": 41, "fault": None, "heating_enabled": True}
+                "cpu_temperature_c": 41, "fault": self.fault, "heating_enabled": True}
 
 
 class FakeCamera:
@@ -153,6 +154,15 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual([], self.manager.overview())
         self.assertEqual("available", self.manager.led_states()[0])
         self.assertEqual(set(), self.manager._reserving_slots)
+
+    def test_camera_health_independent_of_global_sensor_fault(self):
+        self.thermal.temp = 22
+        self.thermal.fault = "SONDE_OU_RELAIS : CRC invalide"
+        self.assertEqual(["available"] * 8, self.manager.camera_health_states())
+        self.assertEqual(["fault"] * 8, self.manager.led_states())
+        self.thermal.fault = None
+        self.assertEqual(["off"] * 8, self.manager.led_states())
+        self.assertEqual(["available"] * 8, self.manager.camera_health_states())
 
     def test_acknowledgement_preserves_error(self):
         item = self.manager.new_test(1, "Test-fail")

@@ -20,8 +20,9 @@ const LABELS = {
 function cameraLabel(cam: CameraStatus): string {
   if (!cam.configured) return "Non configurée";
   if (!cam.connected) return "Déconnectée";
-  if (cam.led === "off") return "Connectée";
-  return LABELS[cam.led];
+  if (cam.health === "fault") return "Défaut caméra";
+  if (cam.health === "running") return "En cours";
+  return "Connectée";
 }
 
 function formatTemp(value: number | null): string {
@@ -43,7 +44,7 @@ function CameraTile({
 }) {
   return (
     <button
-      className={"camera-tile " + camera.led + (selected ? " selected" : "")}
+      className={"camera-tile " + camera.health + (selected ? " selected" : "")}
       onClick={onClick}
       aria-label={"Caméra " + camera.slot + " : " + cameraLabel(camera)}
       type="button"
@@ -58,7 +59,7 @@ function CameraTile({
 function emptyCameras(): CameraStatus[] {
   return Array.from({ length: 8 }, (_, index) => ({
     slot: index + 1, configured: false, connected: false,
-    led: "off" as const, active_test: null,
+    led: "off" as const, health: "off" as const, active_test: null,
   }));
 }
 
@@ -330,7 +331,7 @@ export default function App() {
                 </div>
                 <aside className="camera-info">
                   <strong>CAM {camera}</strong>
-                  <span className={"state-mark " + selected?.led}>{selected ? cameraLabel(selected) : "—"}</span>
+                  <span className={"state-mark " + selected?.health}>{selected ? cameraLabel(selected) : "—"}</span>
                   <p>Flux MJPEG continu sans réencodage. Photographies PNG haute résolution prioritaires.</p>
                   <button className="action" disabled={!selected?.connected}
                     onClick={() => {
