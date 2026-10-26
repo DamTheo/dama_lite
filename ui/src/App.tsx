@@ -123,6 +123,8 @@ export default function App() {
   }, [notice]);
 
   const cameras = status?.cameras ?? emptyCameras();
+  const connectedCount = cameras.filter(cam => cam.connected).length;
+  const configuredCount = cameras.filter(cam => cam.configured).length;
   const selected = cameras.find(c => c.slot === camera);
   const running = (status?.tests ?? []).filter(t => t.state === "running");
   const history = (status?.tests ?? []).filter(t => t.state !== "running").slice(0, 12);
@@ -200,7 +202,7 @@ export default function App() {
             <strong>{formatTemp(status?.thermal.temperature_c ?? null)}</strong>
             <span>{status?.thermal.heater_on ? "CHAUFFE" : status?.thermal.ready ? "PRÊT" : "ATTENTE"}</span>
           </div>
-          <div className="reading counts"><Camera size={17} /><strong>{running.length}/8</strong><span>ACTIVES</span></div>
+          <div className="reading counts"><Camera size={17} /><strong>{connectedCount}/8</strong><span>CAMÉRAS</span></div>
         </div>
       </header>
 
@@ -215,6 +217,12 @@ export default function App() {
         </div>
       )}
       {!online && <div className="warning-strip critical"><WifiOff size={16} /> Contrôleur indisponible : commandes désactivées.</div>}
+      {online && configuredCount > connectedCount && (
+        <div className="warning-strip usb-warning"><AlertTriangle size={16} />
+          USB : {connectedCount} caméra(s) accessibles sur {configuredCount} configurées.
+          Vérifier le(s) hub(s) et leur alimentation.
+        </div>
+      )}
 
       <section className="machine-body">
         {screen === "home" && (
@@ -227,7 +235,7 @@ export default function App() {
               <span className="touch-hint">TOUCHER POUR CONTINUER</span>
             </button>
             <div className="home-stations">
-              <div className="section-caption"><span>EMPLACEMENTS</span><span>{running.length} EN COURS</span></div>
+              <div className="section-caption"><span>EMPLACEMENTS</span><span>{connectedCount} CAMÉRA(S) ACCESSIBLE(S)</span></div>
               <div className="tiles-grid">
                 {cameras.map(cam => (
                   <CameraTile camera={cam} key={cam.slot} onClick={() => {

@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sqlite3
 import tempfile
 from datetime import datetime, timezone
@@ -30,6 +31,39 @@ def discover_uvc_links(root: Path = Path("/dev/v4l/by-path")) -> list[str]:
         if link.exists() and link.resolve().name.startswith("video"):
             result.append(str(link))
     return sorted(result)
+
+
+def reserve_observed_usb_ports(
+    detected: list[str], ports: list[str],
+) -> list[str]:
+    """Réserve uniquement des chemins by-path USB physiquement constatés.
+
+    Les ports peuvent être temporairement inaccessibles (hub en défaut).
+    Cette fonction n'ouvre pas de webcam, et ne déclenche aucun reset USB.
+    Toute réservation est explicite, jamais à chaud ni au runtime.
+    """
+    if not ports:
+        return sorted(detected)
+    if not detected:
+        raise ValueError("Impossible de déterminer la racine USB sans caméra détectée.")
+    pattern = re.compile(
+        r"(?P<before>/dev/v4l/by-path/[^/]+-usb-0:)"
+        r"(?P<port>[0-9]+(?:\.[0-9]+)+)"
+        r"(?P<after>:[0-9]+\.[0-9]+-video-index0)"
+    )
+    matches = [pattern.fullmatch(d) for d in detected]
+    if any(m is None for m in matches):
+        raise ValueError("Impossible de dériver un chemin USB vidéo fiable.")
+    bases = {(m.group("before"), m.group("after")) for m in matches if m}
+    if len(bases) != 1:
+        raise ValueError("Plusieurs contrôleurs USB : fournir une association explicite.")
+    before, after = next(iter(bases))
+    if any(not re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,4}", p) for p in ports):
+        raise ValueError("Port USB invalide : utiliser par exemple 1.1.3.")
+    all_links = sorted(set(detected) | {before + port + after for port in ports})
+    if len(all_links) > 8:
+        raise ValueError("Plus de huit caméras : appairage refusé.")
+    return all_links
 
 
 def propose_slot_mapping(
@@ -110,14 +144,21 @@ def main() -> None:
     parser.add_argument("--config", default=str(STAGING_CONFIG))
     parser.add_argument("--apply", action="store_true",
                         help="Mettre à jour UNIQUEMENT le staging, avec sauvegarde.")
+    parser.add_argument("--reserve-offline-ports", default="",
+                        help="Ports UVC déjà observés mais actuellement hors ligne, séparés par virgules (ex. 1.1.1,1.1.2).")
     args = parser.parse_args()
     cfg_path = Path(args.config)
     cfg = Config.load(cfg_path)
     detected = discover_uvc_links()
     current = {s.slot: s.device for s in cfg.cameras}
-    proposed = propose_slot_mapping(current, detected)
+    expected_ports = [
+        part.strip() for part in args.reserve_offline_ports.split(",") if part.strip()
+    ]
+    candidates = reserve_observed_usb_ports(detected, expected_ports)
+    proposed = propose_slot_mapping(current, candidates)
     result = {
         "observed_usb_video_paths": detected,
+        "reserved_offline_paths": [p for p in candidates if p not in detected],
         "current_slots": current,
         "proposed_slots": proposed,
         "changes": {
