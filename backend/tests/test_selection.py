@@ -36,7 +36,11 @@ class SelectionTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.path = Path(self.tmp.name)
         c = self.path / "config.json"
-        c.write_text('{"heating_enabled":false,"leds_enabled":false}', encoding="utf-8")
+        c.write_text(
+            '{"heating_enabled":false,"leds_enabled":false,'
+            '"state_dir":"' + str(self.path / "state") + '"}',
+            encoding="utf-8",
+        )
         cfg = Config.load(c)
         self.svc = DamaLiteService(
             cfg, thermal=FakeThermal(), cameras=FakeCamera(cfg.cameras),
