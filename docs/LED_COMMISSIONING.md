@@ -114,38 +114,41 @@ Les ordres de blackout photo correctement reçus ne bénéficient
 d'aucune temporisation et restent immédiats. La fréquence de lecture
 est réduite à 2,5 Hz pour limiter la charge du Pi.
 
-\n## Repérage tactile d'un emplacement (nouvelle analyse)\n
-Pendant l'écran « Nouvelle analyse », le kiosque envoie la caméra choisie
-via `POST /api/selection` à intervalles réguliers. Le backend mémorise
-une sélection volatile expirant automatiquement après **4 secondes** ;
-aucun enregistrement SQLite ni écriture SharePoint.
+\n## Repérage LED tactile — mise à jour du 26/10/2026
 
-Seul le segment physique correspondant (8 LED) est modulé doucement
-entre **18 et 100 % du vert déjà limité matériellement à 10 %**,
-avec période de 2,8 secondes. Les sept autres segments restent dans leur
-état normal. **Une analyse en cours reste jaune ; une panne reste rouge**,
-même si cette caméra est sélectionnée. Le noir pendant la photo scientifique
-reste prioritaire. Lors du retour au menu ou après lancement, la sélection
-est effacée ; un navigateur planté perd sa sélection automatiquement.
+Les vues « Nouvelle analyse » et « Retour caméra » envoient la caméra
+sélectionnée à l'API locale \`POST /api/selection\` toutes les 1,5 s.
+La sélection expire automatiquement après **4 secondes** et est
+effacée à la fermeture de la vue, sans trace dans SQLite ni SharePoint.
 
-Le GPIO21, la chauffe et l'autorisation de démarrer un test ne sont
-jamais modifiés par cette fonction.
+Un seul groupe de **8 LED** indique la caméra regardée :
+- vert pulsé si disponible ;
+- jaune pulsé si une expérience est en cours ;
+- rouge pulsé si déconnectée/en défaut.
 
+La couleur de l'état machine est **conservée** : seul le niveau
+d'éclairement du groupe est modulé. Tous les autres groupes restent
+dans leur couleur normale.
 
-## Correction du 26 octobre 2026 — pulsation fluide
+Après retour utilisateur (« clignotement à peine visible »),
+la modulation passe à **2–100 % de la consigne globale**, avec une
+période sinusoïdale de **2,4 secondes** (25 images PWM/s,
+horloge \`time.monotonic()\`). Le maximum matériel du pilote reste
+**10 % d'intensité**, inchangé. Le minimum du groupe sélectionné
+descend donc à environ **0,2 % de pleine intensité**, ce qui produit
+une pulsation beaucoup plus contrastée sans augmenter la puissance.
+La sélection commence au maximum et retrouve sa luminosité normale
+en 0,4 seconde lors de sa disparition.
 
-Après retour utilisateur en vidéo, le rendu de pulsation partageait
-malheureusement le même thread que \`urlopen(/api/status)\` et pouvait
-attendre jusqu'à 1,5 seconde lorsqu'une webcam ou le serveur ralentissait.
-Cela provoquait des pauses aléatoires, donnant une impression de panne.
+La fréquence HTTP de lecture (~2,8 Hz) est indépendante du rendu PWM
+25 Hz, donc une caméra USB lente ne saccade pas la pulsation.
 
-La correction sépare désormais **une lecture HTTP asynchrone**
-(~2,8 Hz) et **un rendu PWM à 25 Hz** avec phase continue
-\`time.monotonic()\`. La sélection démarre au vert plein (maximum 10 %),
-respire lentement avec période 3,6 secondes, entre 35 et 100 % de la
-consigne matérielle, et retrouve progressivement le vert normal
-en 400 ms quand l'utilisateur quitte le menu.
-Le pilote évite les transmissions inutiles si l'image RGB quantifiée
-n'a pas changé. Rouge (défaut), jaune (test) et extinction pendant
-photographie conservent leur priorité, et les LED s'éteignent en cas
-de perte durable du contrôleur local (>3 secondes).
+**Priorités de sécurité :** extinction immédiate des LED pendant une
+photographie scientifique ; rouge si défaut ; extinction après
+3 secondes sans statut HTTP exploitable ou en cas d'arrêt machine.
+La sélection ne peut jamais autoriser un test ni activer GPIO21.
+
+Le 26/10/2026, le service LED est actif sur le Pi et son journal
+confirme les sélections. **Le rendu lumineux réel doit encore être
+validé visuellement** par l'opérateur sur les huit groupes, car
+l'API ne mesure pas la lumière réellement émise.
