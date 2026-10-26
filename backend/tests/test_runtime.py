@@ -159,7 +159,7 @@ class RuntimeTests(unittest.TestCase):
         # Contrairement aux faux périphériques non configurés par défaut,
         # les huit canaux disposent ici d'un port USB explicitement associé.
         self.cam.specs = {
-            slot: replace(self.cam.specs[slot], device=f"/dev/v4l/test-{slot}")
+            slot: replace(self.cam.specs[slot], device=f"/dev/v4l/by-path/usb-slot-{slot}-video-index0")
             for slot in range(1, 9)
         }
         self.thermal.temp = 22
