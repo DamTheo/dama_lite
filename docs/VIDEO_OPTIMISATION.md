@@ -121,3 +121,21 @@ redémarrer. Une première image réussie remet le compteur à zéro ;
 le changement de caméra aussi. Les autres emplacements restent
 accessibles indépendamment, et le bouton « Reconnecter » permet une
 reprise manuelle immédiate.
+
+
+## Fermeture HTTP et erreurs matérielles
+
+Quand FFmpeg s'arrête après l'envoi des en-têtes multipart HTTP 200,
+le serveur doit **terminer la connexion proprement**, pas tenter de
+réécrire un code HTTP 503 après les JPEG (ce qui corrompt le flux).
+Le serveur intercepte désormais explicitement \`LivePreviewError\`
+pendant les écritures multipart et journalise le défaut USB.
+
+Le descripteur USB des huit UC60 déclare **MaxPower 500 mA chacune**
+(valeur maximale annoncée, **pas la consommation mesurée**).
+Les deux hubs Terminus déclarent chacun **MaxPower 100 mA** pour
+leur propre fonction hub. La capacité de l'alimentation réelle des
+ports aval doit être établie : quatre webcams par hub peuvent entraîner
+des besoins en courant élevés et des resets si la distribution est
+insuffisante. Le Pi indique \`throttled=0x0\`, ce qui n'exclut pas
+une chute de tension localisée dans un hub.

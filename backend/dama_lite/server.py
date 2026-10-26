@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 from .cameras import CameraError
+from .live_preview import LivePreviewError
 from .config import Config
 from .interlocks import ensure_gpio_exclusive
 from .service import DamaLiteService
@@ -101,9 +102,10 @@ def make_handler(service: DamaLiteService):
                                     break
                         except (BrokenPipeError, ConnectionResetError):
                             LOG.debug("Client de prévisualisation déconnecté.")
-                        except CameraError as exc:
-                            # En multipart les en-têtes HTTP sont déjà partis ;
-                            # ne jamais écrire une deuxième réponse JSON 503.
+                        except (CameraError, LivePreviewError, OSError) as exc:
+                            # En multipart les en-têtes HTTP sont déjà partis :
+                            # un EOF UVC ne doit jamais déclencher un second
+                            # en-tête HTTP/503 au milieu des JPEG.
                             LOG.warning("Fin flux caméra %d : %s", slot, exc)
                         return
 
