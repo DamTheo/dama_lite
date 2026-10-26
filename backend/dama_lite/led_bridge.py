@@ -78,11 +78,15 @@ def gentle_pulse_factor(elapsed: float, cycle_seconds: float = 3.6) -> float:
 
 
 def selected_available_slot(snapshot: dict, states: list[str]) -> int | None:
-    """Défaut rouge, analyse jaune et blackout photo priment sur le repérage."""
+    """Repère la caméra visualisée, quel que soit son état (vert/jaune/rouge).
+
+    L'extinction pour une photo et l'arrêt machine restent prioritaires.
+    Le nom historique de la fonction est conservé pour les anciens tests.
+    """
     slot = snapshot.get("ui_selected_camera")
     if type(slot) is not int or not 1 <= slot <= 8:
         return None
-    if snapshot.get("led_blackout") or states[slot - 1] != "available":
+    if snapshot.get("power") != "on" or snapshot.get("led_blackout"):
         return None
     return slot
 
@@ -182,6 +186,11 @@ def run_polling(controller: LightController, stopped: threading.Event) -> None:
                     else states_from_snapshot(snapshot)
                 )
                 selected = selected_available_slot(snapshot, states)
+                # Même un emplacement déconnecté doit pouvoir être repéré :
+                # son groupe rouge respire pendant que l'opérateur regarde
+                # la caméra, sans prétendre qu'elle est fonctionnelle.
+                if selected is not None and states[selected - 1] == "off":
+                    states[selected - 1] = "fault"
             if states != old_states or selected != old_selected:
                 LOG.info(
                     "LED GPIO12 : %s ; repérage=%s",
@@ -194,7 +203,7 @@ def run_polling(controller: LightController, stopped: threading.Event) -> None:
                 controller.update(states)
                 continue
             slot, factor = animator.frame(selected, now)
-            if slot is not None and states[slot - 1] != "available":
+            if slot is not None and states[slot - 1] == "off":
                 slot, factor = None, 1.0
             controller.update(states, pulse_slot=slot, pulse_factor=factor)
     finally:

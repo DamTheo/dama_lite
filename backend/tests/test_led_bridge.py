@@ -58,7 +58,7 @@ class LedBridgeTests(unittest.TestCase):
         self.assertFalse(should_hold_previous(100.0, 103.0))
         self.assertFalse(should_hold_previous(100.0, 104.5))
 
-    def test_soft_selection_blinks_only_available_slot(self):
+    def test_soft_selection_blinks_including_running_and_fault(self):
         data = {
             "power": "on", "ui_selected_camera": 3,
             "thermal": {"fault": None},
@@ -71,9 +71,9 @@ class LedBridgeTests(unittest.TestCase):
         self.assertEqual(3, selected_available_slot(data, states))
         data["cameras"][2]["health"] = "running"
         states = states_from_snapshot(data)
-        self.assertIsNone(selected_available_slot(data, states))
+        self.assertEqual(3, selected_available_slot(data, states))
         data["cameras"][2]["health"] = "fault"
-        self.assertIsNone(selected_available_slot(data, states_from_snapshot(data)))
+        self.assertEqual(3, selected_available_slot(data, states_from_snapshot(data)))
         data["cameras"][2]["health"] = "available"
         data["led_blackout"] = True
         self.assertIsNone(selected_available_slot(data, states_from_snapshot(data)))
@@ -99,7 +99,12 @@ class LedBridgeTests(unittest.TestCase):
             ["available", "available", "fault"] + ["available"] * 5,
             pulse_slot=3, pulse_factor=0.2,
         )
-        self.assertEqual([(255, 0, 0)] * 8, strip.colors[16:24])
+        self.assertEqual([(51, 0, 0)] * 8, strip.colors[16:24])
+        controller.update(
+            ["available", "available", "running"] + ["available"] * 5,
+            pulse_slot=3, pulse_factor=0.2,
+        )
+        self.assertEqual([(51, 34, 0)] * 8, strip.colors[16:24])
         with self.assertRaises(ValueError):
             controller.update(["available"] * 8, pulse_slot=3, pulse_factor=1.2)
         controller.close()

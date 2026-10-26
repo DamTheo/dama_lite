@@ -60,9 +60,10 @@ class LightController:
         with self._lock:
             self._last = pixel_colors(states)
             output = list(self._last)
-            # Le pulse ne remplace jamais un défaut rouge ni une analyse
-            # jaune ; il assombrit seulement la position verte choisie.
-            if pulse_slot is not None and states[pulse_slot - 1] == "available":
+            # Le repérage module uniquement la luminosité de la couleur
+            # existante : vert=dispo, jaune=en cours, rouge=défaut.
+            # Aucune couleur de sécurité n'est remplacée.
+            if pulse_slot is not None and states[pulse_slot - 1] != "off":
                 offset = (pulse_slot - 1) * 8
                 for i in range(offset, offset + 8):
                     output[i] = tuple(int(channel * pulse_factor) for channel in output[i])

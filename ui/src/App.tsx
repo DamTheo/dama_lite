@@ -146,7 +146,7 @@ export default function App() {
   useEffect(() => {
     // Le clignotement des 8 LED sélectionnées s'arrête au changement de
     // page ; s'il y a une coupure réseau, le Pi l'expire au bout de 4 s.
-    if (screen !== "new") {
+    if (screen !== "new" && screen !== "camera") {
       void selectCameraForSetup(null).catch(() => undefined);
       return;
     }
@@ -174,9 +174,13 @@ export default function App() {
   const running = (status?.tests ?? []).filter(t => t.state === "running");
   const history = (status?.tests ?? []).filter(t => t.state !== "running").slice(0, 12);
   const selectedReady = Boolean(
-    selected?.led === "available" && status?.sharepoint_configured
-    && status?.thermal.ready && online,
+    selected?.connected && selected.health === "available" &&
+    status?.sharepoint_configured && status?.thermal.ready && online &&
+    status?.power === "on",
   );
+  // L'accès au nom ne nécessite pas la chauffe : seule l'action
+  // "Lancer" est soumise à la sécurité des 35 °C.
+  const canPrepare = Boolean(selected?.configured && !currentCameraTest && online);
   const folderNameError = validateExperimentFolder(name);
   const isShutting = status?.power === "shutting";
   const title = useMemo(() => ({
@@ -428,8 +432,9 @@ export default function App() {
                       <Square size={18} /> Terminer l'expérience
                     </button>
                   ) : (
-                    <button className="action primary" disabled={!selectedReady} onClick={() => setScreen("new")}>
-                      <Play size={18} /> Nouveau test
+                    <button className="action primary" disabled={!canPrepare}
+                      onClick={() => { setName(""); setKeyboard(false); setScreen("new"); }}>
+                      <Play size={18} /> Lancer une analyse
                     </button>
                   )}
                 </aside>
