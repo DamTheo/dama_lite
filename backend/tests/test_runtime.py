@@ -112,6 +112,20 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(1, self.store.tests()[0]["pending_uploads"])
         self.assertEqual(0, self.leds.black)
 
+    def test_finish_experiment_keeps_photos_for_sharepoint_and_releases_led(self):
+        item = self.manager.new_test(1, "FIN-EXP-01")
+        self.assertEqual("running", self.manager.camera_health_states()[0])
+        self.assertEqual("running", self.manager.led_states()[0])
+        self.manager._capture(item["id"])
+        self.assertEqual(1, self.store.tests()[0]["pending_uploads"])
+        self.manager.stop_test(item["id"])
+        finished = self.store.tests()[0]
+        self.assertEqual("stopped", finished["state"])
+        self.assertEqual(1, finished["images_count"])
+        self.assertEqual(1, finished["pending_uploads"])
+        self.assertEqual("available", self.manager.camera_health_states()[0])
+        self.assertEqual("available", self.manager.led_states()[0])
+
     def test_slot_single_user_and_unique_test_name(self):
         self.manager.new_test(1, "Test-1")
         with self.assertRaises(CannotStart):
