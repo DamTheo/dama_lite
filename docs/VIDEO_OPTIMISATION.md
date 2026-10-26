@@ -143,21 +143,28 @@ une chute de tension localisée dans un hub.
 
 ## Suppression des microcoupures logicielles (26/10/2026, V2)
 
-Une seconde revue du backend a identifié un mécanisme interne de perte
-d'images : les huit webcams UC60 transmettent un MJPEG natif demandé
-à **10 images/s**, mais le relais Python refusait une nouvelle image
-moins de **120 ms après la précédente**. Comme deux images normales
-peuvent être espacées de 100 ms, environ une image sur deux était
-rejetée, ce qui explique les **5–6 i/s mesurées malgré une source 10 Hz**.
+La revue du backend a identifié une perte artificielle d'images :
+le worker Python rejetait toute image reçue moins de **120 ms**
+après la précédente, quelle que soit la cadence effective du
+périphérique. Cela plafonnait le retour à 8,3 images/s ; les essais
+précédents montraient effectivement **5–6 images/s**.
 
-Le filtre de 120 ms est supprimé. Le worker garde en mémoire la
-**dernière image JPEG complète**, sans file persistante et sans jamais
-fabriquer d'image. Les lecteurs HTTP suivent le flux dans la limite
-de leur capacité ; si Chromium prend du retard, ils récupèrent la plus
-récente au lieu de bloquer le Pi. Le débit USB reste limité à **10 i/s**
-par FFmpeg : cette correction ne hausse ni la résolution ni le débit
-demandé au périphérique, ce qui protège le hub fragile.
-Le timeout de gel passe de 7 à 5 secondes.
+Le filtrage est désormais supprimé. Le worker ne conserve que la
+**dernière image JPEG complète**, sans file de retard ni fabrication
+d'images. Un navigateur plus lent saute naturellement les anciennes
+images pour conserver un retour aussi direct que possible.
+
+**Mesures sur Incub-resa après déploiement :**
+- CAM1 : 153 trames MJPEG en 6,01 s, soit **25,46 images/s**
+- CAM3 : 123 trames MJPEG en 5,01 s, soit **24,55 images/s**
+
+Ces valeurs représentent les parties JPEG reçues dans le flux HTTP,
+et non une mesure de la fréquence de décodage du navigateur. La commande
+FFmpeg demande un mode à 10 i/s mais les images réellement délivrées
+sont plus nombreuses, signe que la demande de fréquence n'est pas
+nécessairement appliquée par le périphérique UVC. **Le mode USB
+demandé n'a pas été modifié**, pas plus que la capture PNG scientifique.
+Le timeout de flux figé est réduit de 7 à 5 secondes.
 
 Attention : \`640×480\` est le mode UVC natif choisi pour garder
 l'aperçu léger ; les photos scientifiques sont enregistrées en
