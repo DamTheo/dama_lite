@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle, ArrowLeft, Camera, Check, CircleOff, Cloud,
-  CloudOff, Flame, Image, Play, Square, Thermometer, WifiOff,
+  CloudOff, Flame, Image, Play, Power, Square, Thermometer, WifiOff,
 } from "lucide-react";
-import { acknowledgeCamera, getStatus, selectCameraForSetup, streamUrl, startTest, stopTest } from "./api";
+import { acknowledgeCamera, cancelShutdownConfirmation, getStatus, selectCameraForSetup, shutdownMachine, streamUrl, startTest, stopTest } from "./api";
 import { Face, PowerOverlay } from "./Face";
 import TouchKeyboard from "./TouchKeyboard";
 import type { CameraStatus, MachineStatus, Screen, TestStatus } from "./types";
@@ -89,6 +89,8 @@ export default function App() {
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmStop, setConfirmStop] = useState<TestStatus | null>(null);
+  const [confirmShutdown, setConfirmShutdown] = useState(false);
+  const [shuttingDown, setShuttingDown] = useState(false);
   const [bootVisible, setBootVisible] = useState(true);
   const [frameTime, setFrameTime] = useState(Date.now());
   const [frameError, setFrameError] = useState(false);
@@ -159,6 +161,14 @@ export default function App() {
   }, [screen, camera]);
 
   useEffect(() => {
+    if (status?.shutdown_confirmation_required) {
+      setConfirmStop(null);
+      setKeyboard(false);
+      setConfirmShutdown(true);
+    }
+  }, [status?.shutdown_confirmation_required]);
+
+  useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(null), 5500);
     return () => clearTimeout(timer);
@@ -182,7 +192,7 @@ export default function App() {
   // "Lancer" est soumise à la sécurité des 35 °C.
   const canPrepare = Boolean(selected?.configured && !currentCameraTest && online);
   const folderNameError = validateExperimentFolder(name);
-  const isShutting = status?.power === "shutting";
+  const isShutting = shuttingDown || status?.power === "shutting";
   const title = useMemo(() => ({
     home: "ACCUEIL", menu: "QUE SOUHAITEZ-VOUS FAIRE ?",
     new: "NOUVELLE ANALYSE", cameras: "CAMÉRAS",
@@ -224,6 +234,26 @@ export default function App() {
     }
   }
 
+  async function powerOff() {
+    if (working || shuttingDown) return;
+    setWorking(true);
+    try {
+      await shutdownMachine(true);
+      setShuttingDown(true);
+      setConfirmShutdown(false);
+      setKeyboard(false);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Extinction impossible.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  function cancelPowerOff() {
+    setConfirmShutdown(false);
+    void cancelShutdownConfirmation().catch(() => undefined);
+  }
+
   async function clearCameraFault(slot: number) {
     setWorking(true);
     try {
@@ -257,6 +287,12 @@ export default function App() {
             <span>{!status?.thermal.heating_enabled ? "CHAUFFE OFF" : status.thermal.heater_on ? "CHAUFFE" : status.thermal.ready ? "PRÊT" : "ATTENTE"}</span>
           </div>
           <div className="reading counts"><Camera size={17} /><strong>{connectedCount}/8</strong><span>CAMÉRAS</span></div>
+          <button className="power-button" type="button" aria-label="Éteindre le Raspberry Pi proprement"
+            title={status?.shutdown_available ? "Éteindre DAMA Lite" : "Extinction OS non configurée"}
+            disabled={!online || isShutting || working || !status?.shutdown_available}
+            onClick={() => { setKeyboard(false); setConfirmStop(null); setConfirmShutdown(true); }}>
+            <Power size={20} />
+          </button>
         </div>
       </header>
 
@@ -370,8 +406,9 @@ export default function App() {
                 </div>
                 <div className="hint-line">
                   {name && folderNameError ? folderNameError
-                    : !folderNameError ? "DOSSIER : DAMA-Lite / " + name
                     : status?.thermal.fault ? "Défaut thermique : lancement bloqué"
+                    : !status?.thermal.ready ? "Nom possible dès maintenant ; lancement uniquement dès 35 °C."
+                    : !folderNameError ? "DOSSIER : DAMA-Lite / " + name
                     : !status?.thermal.ready ? "Le lancement nécessite une enceinte à 35 °C minimum."
                       : !status.sharepoint_configured ? "SharePoint non configuré."
                         : !selected?.connected ? "Caméra non connectée."
@@ -486,7 +523,26 @@ export default function App() {
       </footer>
 
       {keyboard && screen === "new" && <TouchKeyboard value={name} onChange={setName} onDone={() => setKeyboard(false)} />}
-      {confirmStop && <div className="modal-backdrop"><div className="confirm-card">
+      {confirmShutdown && <div className="modal-backdrop"><div className="confirm-card shutdown-card"
+        role="dialog" aria-modal="true" aria-label="Confirmer l'extinction de DAMA Lite">
+        <Power size={29} /><h2>Éteindre DAMA Lite ?</h2>
+        {running.length > 0 ? (
+          <>
+            <p><strong>{running.length} expérience(s) en cours.</strong> Confirmer terminera toutes les sessions et arrêtera les acquisitions.</p>
+            <p className="shutdown-names">{running.map(t => t.name).join(" · ")}</p>
+          </>
+        ) : <p>Aucune expérience en cours. Le Raspberry Pi s'éteindra proprement.</p>}
+        {(status?.pending_uploads ?? 0) > 0 && <p>
+          {status?.pending_uploads} photo(s) en attente de SharePoint :
+          elles resteront sur le Pi pour synchronisation au prochain démarrage.
+        </p>}
+        <p>La chauffe est coupée en priorité ; extinction Linux après l'animation.</p>
+        <button className="action danger" disabled={working} onClick={() => void powerOff()}>
+          <Power size={18} /> {working ? "Préparation de l'arrêt…" : "Confirmer et éteindre"}
+        </button>
+        <button className="action" disabled={working} onClick={cancelPowerOff}>Annuler, rester allumé</button>
+      </div></div>}
+      {confirmStop && !confirmShutdown && <div className="modal-backdrop"><div className="confirm-card">
         <AlertTriangle size={28} /><h2>Terminer l'expérience ?</h2>
         <p>{confirmStop.name} — caméra {confirmStop.camera_slot}. Les nouvelles acquisitions s'arrêtent ; les photos déjà acquises seront conservées et transférées sur SharePoint.</p>
         <button className="action danger" disabled={working} onClick={() => void stopCurrent(confirmStop)}>Confirmer la fin</button>

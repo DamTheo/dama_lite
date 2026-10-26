@@ -46,6 +46,21 @@ export function acknowledgeCamera(slot: number): Promise<{ ok: boolean }> {
   });
 }
 
+export function shutdownMachine(confirmActiveTests: boolean): Promise<{ status: string; ended_tests: number }> {
+  return request("/api/shutdown", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm_active_tests: confirmActiveTests }),
+  });
+}
+
+export function cancelShutdownConfirmation(): Promise<{ ok: boolean }> {
+  return request("/api/shutdown/cancel", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+}
+
 export function streamUrl(slot: number, moment: number): string {
   return "/api/cameras/" + slot + "/stream?t=" + moment;
 }

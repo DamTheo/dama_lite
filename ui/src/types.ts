@@ -40,6 +40,9 @@ export interface MachineStatus {
   cameras: CameraStatus[];
   tests: TestStatus[];
   sharepoint_configured: boolean;
+  shutdown_available: boolean;
+  shutdown_confirmation_required: boolean;
+  pending_uploads: number;
   ui_selected_camera: number | null;
   interval_seconds: number;
   temperature_start_min_c: number;

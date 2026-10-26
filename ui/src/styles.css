@@ -33,6 +33,11 @@ svg { flex-shrink: 0; }
 .brand strong small { font-size: 11px; letter-spacing: .22em; color: var(--muted); font-weight: 500; }
 .brand-sub { display: block; margin-top: 4px; font-size: 10px; color: var(--muted); letter-spacing: .1em; }
 .machine-readings { display: flex; align-items: center; gap: 10px; }
+.power-button { display: grid; place-items: center; width: 44px; height: 42px; flex: 0 0 44px; padding: 0; border-radius: 11px; background: #29191b; color: #f8c3c7; border: 1px solid #88434c; }
+.power-button:active:not(:disabled) { background: #7a343d; }
+.power-button:disabled { opacity: .35; }
+.shutdown-card { max-width: 520px; max-height: 93dvh; overflow-y: auto; }
+.shutdown-card .shutdown-names { max-height: 60px; overflow-y: auto; color: var(--yellow); overflow-wrap: anywhere; }
 .reading { display: flex; align-items: center; height: 42px; gap: 10px; padding: 0 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); }
 .reading svg { color: var(--yellow); }
 .reading strong { font-size: 21px; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -253,6 +258,7 @@ svg { flex-shrink: 0; }
 }
 @media (max-width: 850px) {
   .machine-header { padding: 7px 13px; }
+  .power-button { width: 39px; height: 38px; flex-basis: 39px; }
   .home-layout { padding: 10px 12px; gap: 10px; grid-template-columns: 39% 61%; }
   .home-stations { gap: 8px; }
   .tiles-grid { gap: 7px; }
@@ -287,6 +293,7 @@ svg { flex-shrink: 0; }
 @media (max-width: 550px) {
   .brand-sub, .reading span, .machine-footer span:last-child { display: none; }
   .machine-readings { gap: 4px; }
+  .power-button { width: 36px; flex-basis: 36px; }
   .reading { padding: 0 6px; gap: 4px; }
   .home-layout { grid-template-columns: 1fr; overflow-y: auto; }
   .face-card { min-height: 220px; }
