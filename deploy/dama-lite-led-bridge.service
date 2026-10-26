@@ -1,0 +1,26 @@
+[Unit]
+Description=DAMA Lite - bandeau LED 64 pixels (GPIO12, max 10 %)
+Requires=dama-lite-staging.service
+After=dama-lite-staging.service
+ConditionPathExists=/etc/dama-lite/leds-qualified
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/home/damocles/dama-lite-staging
+Environment=PYTHONPATH=/home/damocles/dama-lite-staging/backend
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 -m dama_lite.led_bridge --run-service
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=6
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+UMask=0077
+RestrictAddressFamilies=AF_INET AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

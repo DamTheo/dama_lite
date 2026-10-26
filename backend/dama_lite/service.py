@@ -76,6 +76,7 @@ class DamaLiteService:
             ],
             "tests": items,
             "sharepoint_configured": self.cfg.sharepoint.configured,
+            "led_blackout": self.lights.blackout_active,
             "interval_seconds": self.cfg.camera_interval_s,
             "temperature_start_min_c": self.cfg.start_min_c,
             "setpoint_c": self.cfg.setpoint_c,

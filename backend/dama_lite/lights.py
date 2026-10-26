@@ -52,6 +52,11 @@ class LightController:
             if self._blackout_depth == 0:
                 self._write(self._last)
 
+    @property
+    def blackout_active(self) -> bool:
+        with self._lock:
+            return self._blackout_depth > 0
+
     def blackout_on(self) -> None:
         with self._lock:
             self._blackout_depth += 1

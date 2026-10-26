@@ -32,10 +32,12 @@ class LedTests(unittest.TestCase):
         leds = LightController(False, 12, .1, driver=strip)
         leds.update(["running"] * 8)
         leds.blackout_on()
+        self.assertTrue(leds.blackout_active)
         self.assertEqual([(0, 0, 0)] * 64, strip.colors)
         leds.update(["available"] * 8)
         self.assertEqual([(0, 0, 0)] * 64, strip.colors)
         leds.blackout_off()
+        self.assertFalse(leds.blackout_active)
         self.assertEqual([(0, 255, 0)] * 64, strip.colors)
         leds.close()
 
