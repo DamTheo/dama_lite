@@ -49,3 +49,39 @@ class AuthTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GraphEnvOauthTests(unittest.TestCase):
+    def test_client_credentials_cached_without_exposing_secret(self):
+        from unittest.mock import patch
+        import tempfile
+        from pathlib import Path
+        from dama_lite.config import SharePointConfig
+        from dama_lite.sharepoint import SharePointClient
+
+        with tempfile.TemporaryDirectory() as temp:
+            file = Path(temp) / "graph.env"
+            file.write_text(
+                "MS_TENANT_ID=tenant\nMS_CLIENT_ID=client\n"
+                "MS_CLIENT_SECRET=private-test-value\nMS_DRIVE_ID=drive\n",
+                encoding="utf-8",
+            )
+            file.chmod(0o600)
+            cfg = SharePointConfig(
+                tenant_id="tenant", client_id="client",
+                drive_id="drive", graph_env_path=str(file),
+            )
+            reply = MagicMock()
+            reply.ok = True
+            reply.json.return_value = {
+                "access_token": "token-test", "expires_in": 3600
+            }
+            with patch("requests.post", return_value=reply) as request:
+                client = SharePointClient(cfg)
+                self.assertEqual("token-test", client._token())
+                self.assertEqual("token-test", client._token())
+            self.assertEqual(1, request.call_count)
+            self.assertEqual(
+                "private-test-value",
+                request.call_args.kwargs["data"]["client_secret"],
+            )

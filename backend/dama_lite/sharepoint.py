@@ -10,6 +10,7 @@ import logging
 import re
 import stat
 import threading
+import time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -46,10 +47,64 @@ class SharePointClient:
         self._app = None
         self._lock = threading.RLock()
         self._drive_verified = False
+        self._graph_access_token: str | None = None
+        self._graph_token_expiry: float = 0.0
 
     def _token(self) -> str:
         if not self.cfg.configured:
             raise SharePointError("SharePoint non configuré : impossible de démarrer une analyse.")
+        if self.cfg.graph_env_path:
+            # Client credentials Entra via HTTPS, depuis le fichier local 0600.
+            # Cette voie évite d'installer MSAL dans le Python système du Pi.
+            import requests
+
+            with self._lock:
+                if self._graph_access_token and time.monotonic() < self._graph_token_expiry:
+                    return self._graph_access_token
+                keys = read_graph_env(self.cfg.graph_env_path)
+                endpoint = (
+                    "https://login.microsoftonline.com/"
+                    + quote(self.cfg.tenant_id, safe="")
+                    + "/oauth2/v2.0/token"
+                )
+                try:
+                    reply = requests.post(
+                        endpoint,
+                        data={
+                            "grant_type": "client_credentials",
+                            "client_id": self.cfg.client_id,
+                            "client_secret": keys["MS_CLIENT_SECRET"],
+                            "scope": "https://graph.microsoft.com/.default",
+                        },
+                        timeout=(10, 25),
+                    )
+                except requests.RequestException as exc:
+                    raise SharePointError(
+                        "Connexion à Microsoft Entra impossible."
+                    ) from exc
+                if not reply.ok:
+                    try:
+                        code = reply.json().get("error", "auth_failed")
+                    except ValueError:
+                        code = "auth_failed"
+                    raise SharePointError(
+                        f"Microsoft Entra HTTP {reply.status_code} ({code})."
+                    )
+                try:
+                    reply_data = reply.json()
+                    token = reply_data["access_token"]
+                    expires = int(reply_data.get("expires_in", 3600))
+                except (KeyError, ValueError, TypeError) as exc:
+                    raise SharePointError(
+                        "Réponse Microsoft Entra invalide."
+                    ) from exc
+                if not isinstance(token, str) or not token:
+                    raise SharePointError("Microsoft Entra : jeton absent.")
+                self._graph_access_token = token
+                self._graph_token_expiry = (
+                    time.monotonic() + max(5, expires - 120)
+                )
+                return token
         with self._lock:
             if self._app is None:
                 from msal import ConfidentialClientApplication
@@ -121,6 +176,8 @@ class SharePointClient:
                 # mis en cache. Le flux client_credentials n'a pas de RT.
                 with self._lock:
                     self._app = None
+                    self._graph_access_token = None
+                    self._graph_token_expiry = 0.0
                 token = self._token()
                 continue
             if response.status_code == 409:

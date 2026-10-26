@@ -1,26 +1,19 @@
 undefined
 
-## Identifiants déjà déployés (audit du 26 octobre 2026)
+### Bascule contrôlée vers le fichier existant (sans activer les GPIO)
 
-Sur Incub-resa, le fichier privé \`/etc/dama-lite/graph.env\` existe, mode
-\`0600\`, avec les cinq variables **non vides** :
-\`MS_TENANT_ID\`, \`MS_CLIENT_ID\`, \`MS_CLIENT_SECRET\`,
-\`MS_DRIVE_ID\`, \`MS_FOLDER_ID\`.
-
-Pour éviter de demander une seconde fois le secret, le backend supporte
-désormais dans la section SharePoint du JSON **uniquement le chemin** :
-
-\`\`\`json
-{"graph_env_path":"/etc/dama-lite/graph.env"}
+\`\`\`bash
+cd /home/damocles/dama-lite-staging
+PYTHONPATH=backend python3 -m dama_lite.graph_setup --configure
+sudo systemctl restart dama-lite-staging.service
+PYTHONPATH=backend python3 -m dama_lite.graph_setup --verify
 \`\`\`
 
-Le logiciel charge en mémoire les identifiants, conserve le secret
-exclusivement dans ce fichier privé et **vérifie avant tout POST** que
-l'ID de dossier reçu pour le chemin exact \`DAMA-Lite\` correspond à
-\`MS_FOLDER_ID\`. Aucune variable secrète n'est ajoutée à Git, au
-fichier JSON, à l'URL du navigateur ou aux journaux.
-
-Le contrôle de préproduction \`SharePointClient.verify_read_only()\`
-effectue seulement les GET du lecteur \`R&D Biologie\` et du dossier
-exact et ne crée ni test, ni photo. Le service staging peut activer
-SharePoint indépendamment de la chauffe et des LED.
+\`--configure\` sauvegarde atomiquement le JSON précédent, refuse tout
+changement de GPIO ou remplacement d'identifiants existants et inscrit
+seulement \`graph_env_path\`. \`--verify\` effectue les GET distants
+nécessaires pour vérifier la bibliothèque et le dossier cible ; **aucun
+dossier ni photo n'est créé**. Pour le mode MS_*, le backend utilise
+l'endpoint OAuth 2.0 client_credentials directement avec \`requests\`,
+en gardant le secret et le jeton en mémoire uniquement. MSAL reste
+disponible pour les autres profils d'authentification.
