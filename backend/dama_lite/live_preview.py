@@ -74,6 +74,7 @@ class _Stream:
     error: str | None = None
     clients: int = 0
     idle_since: float | None = None
+    last_requested_at: float = field(default_factory=time.monotonic)
     worker: threading.Thread | None = None
 
 
@@ -107,7 +108,32 @@ class LivePreviewManager:
         self._lock = threading.RLock()
         self._streams: dict[int, _Stream] = {}
         self._photo_slots: set[int] = set()
+        self._focus_slot: int | None = None
         self._closed = False
+
+    def set_focus(self, slot: int | None) -> None:
+        """Un seul écran caméra du kiosque : fermer les anciens flux UVC.
+
+        Chromium peut conserver des connexions MJPEG ouvertes même après
+        navigation. Elles occupaient les trois places du quota et CAM4
+        retournait HTTP 503. Le focus ne touche jamais aux photos PNG.
+        """
+        if slot is not None and (type(slot) is not int or not 1 <= slot <= 8):
+            raise ValueError("Caméra de visualisation invalide.")
+        with self._lock:
+            if self._closed or slot == self._focus_slot:
+                return
+            self._focus_slot = slot
+            stale = [
+                (old_slot, session)
+                for old_slot, session in self._streams.items()
+                if old_slot != slot
+            ]
+            for old_slot, _ in stale:
+                self._streams.pop(old_slot, None)
+            for old_slot, session in stale:
+                LOG.info("Fermeture ancien aperçu CAM %d après changement de vue", old_slot)
+                stop_process(session)
 
     @staticmethod
     def ffmpeg_command(device: str) -> list[str]:
@@ -143,11 +169,27 @@ class LivePreviewManager:
                         for old_slot, s in self._streams.items()
                         if s.clients == 0
                     ]
-                    if not idle:
-                        raise LivePreviewError(
-                            "Trop d'aperçus actifs : fermer une autre vue."
+                    if idle:
+                        _, old_slot, old = min(idle)
+                    else:
+                        # Même si le navigateur retient trois anciens
+                        # lecteurs, la nouvelle caméra doit pouvoir
+                        # s'ouvrir. Éviction LRU, jamais le flux demandé.
+                        candidates = [
+                            (s.last_requested_at, old_slot, s)
+                            for old_slot, s in self._streams.items()
+                            if old_slot != self._focus_slot
+                        ]
+                        if not candidates:
+                            candidates = [
+                                (s.last_requested_at, old_slot, s)
+                                for old_slot, s in self._streams.items()
+                            ]
+                        _, old_slot, old = min(candidates)
+                        LOG.warning(
+                            "Quota vidéo : fermeture du flux obsolète CAM %d",
+                            old_slot,
                         )
-                    _, old_slot, old = min(idle)
                     self._streams.pop(old_slot, None)
                     stop_process(old)
                 try:
@@ -167,6 +209,7 @@ class LivePreviewManager:
                 session.worker.start()
             session.clients += 1
             session.idle_since = None
+            session.last_requested_at = time.monotonic()
         try:
             yield self._frames(session, slot)
         finally:

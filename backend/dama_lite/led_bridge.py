@@ -70,11 +70,16 @@ def should_hold_previous(
     return last_valid_at is not None and now - last_valid_at < grace_seconds
 
 
-def gentle_pulse_factor(elapsed: float, cycle_seconds: float = 3.6) -> float:
-    """Respiration sinusoïdale 35–100 % d'une luminosité plafonnée à 10 %."""
+def gentle_pulse_factor(elapsed: float, cycle_seconds: float = 2.4) -> float:
+    """Respiration contrastée 2–100 % du plafond matériel fixé à 10 %.
+
+    Le précédent minimum à 35 % rendait la pulsation presque invisible
+    au laboratoire. Ici le groupe sélectionné passe brièvement près du
+    noir sans dépasser l'intensité habituelle ni changer sa couleur.
+    """
     if cycle_seconds <= 0:
         raise ValueError("Période de pulsation invalide.")
-    return 0.675 + 0.325 * math.cos(2.0 * math.pi * elapsed / cycle_seconds)
+    return 0.51 + 0.49 * math.cos(2.0 * math.pi * elapsed / cycle_seconds)
 
 
 def selected_available_slot(snapshot: dict, states: list[str]) -> int | None:

@@ -102,6 +102,59 @@ class SharedPreviewTests(unittest.TestCase):
                 self.assertEqual(2, spawn.call_count)
             manager.close()
 
+    def test_focus_frees_other_active_preview_streams(self):
+        import time
+        from unittest.mock import patch
+
+        class FakeProcess:
+            stdout = None
+            def __init__(self): self.terminated = False
+            def poll(self): return 0 if self.terminated else None
+            def terminate(self): self.terminated = True
+            def wait(self, timeout=None): return 0
+            def kill(self): self.terminated = True
+
+        mgr = LivePreviewManager()
+        def reader_wait(slot, session):
+            session.stop.wait(timeout=2)
+        with patch("dama_lite.live_preview.subprocess.Popen",
+                   side_effect=lambda *a, **k: FakeProcess()) as spawn:
+            with patch.object(mgr, "_read_loop", side_effect=reader_wait):
+                with mgr.open(1, "/dev/v4l/by-path/one"):
+                    with mgr.open(2, "/dev/v4l/by-path/two"):
+                        with mgr.open(3, "/dev/v4l/by-path/three"):
+                            self.assertEqual(3, len(mgr._streams))
+                            mgr.set_focus(4)
+                            self.assertEqual({}, mgr._streams)
+                            with mgr.open(4, "/dev/v4l/by-path/four"):
+                                self.assertEqual(4, spawn.call_count)
+                                self.assertEqual({4}, set(mgr._streams))
+        mgr.close()
+
+    def test_eviction_allows_fourth_camera_if_browser_keeps_old_clients(self):
+        from unittest.mock import patch
+        class FakeProcess:
+            stdout = None
+            def __init__(self): self.terminated = False
+            def poll(self): return 0 if self.terminated else None
+            def terminate(self): self.terminated = True
+            def wait(self, timeout=None): return 0
+            def kill(self): self.terminated = True
+
+        mgr = LivePreviewManager()
+        with patch("dama_lite.live_preview.subprocess.Popen",
+                   side_effect=lambda *a, **k: FakeProcess()) as spawn:
+            with patch.object(mgr, "_read_loop",
+                              side_effect=lambda slot, s: s.stop.wait(2)):
+                with mgr.open(1, "dev1"):
+                    with mgr.open(2, "dev2"):
+                        with mgr.open(3, "dev3"):
+                            with mgr.open(4, "dev4"):
+                                self.assertEqual(4, spawn.call_count)
+                                self.assertLessEqual(len(mgr._streams), 3)
+                                self.assertIn(4, mgr._streams)
+        mgr.close()
+
     def test_no_usb_photo_interference_from_preview(self):
         from unittest.mock import patch
         manager = LivePreviewManager()

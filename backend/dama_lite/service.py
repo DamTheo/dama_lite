@@ -79,6 +79,8 @@ class DamaLiteService:
             self._ui_selected_until = (
                 time.monotonic() + 4.0 if slot is not None else 0.0
             )
+        if hasattr(self.cameras, "focus_view"):
+            self.cameras.focus_view(slot)
 
     def ui_selected_camera(self) -> int | None:
         with self._lock:

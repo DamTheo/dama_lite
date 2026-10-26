@@ -33,6 +33,10 @@ class CameraController:
         self._usb_lock = threading.Lock()
         self._live = LivePreviewManager()
 
+    def focus_view(self, slot: int | None) -> None:
+        """Libérer les anciennes prévisualisations au changement de caméra."""
+        self._live.set_focus(slot)
+
     def ready(self, slot: int) -> bool:
         spec = self.specs.get(slot)
         return bool(spec and spec.device and Path(spec.device).exists())

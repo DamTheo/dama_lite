@@ -104,7 +104,8 @@ class LedBridgeTests(unittest.TestCase):
         from math import isclose
         self.assertTrue(isclose(gentle_pulse_factor(0), 1.0))
         samples = [gentle_pulse_factor(index * 0.05) for index in range(120)]
-        self.assertGreaterEqual(min(samples), 0.179)
+        self.assertLessEqual(min(samples), 0.021)
+        self.assertGreaterEqual(min(samples), 0.0)
         self.assertLessEqual(max(samples), 1.0)
         strip = SimulatedPixels()
         controller = LightController(
@@ -128,6 +129,18 @@ class LedBridgeTests(unittest.TestCase):
             controller.update(["available"] * 8, pulse_slot=3, pulse_factor=1.2)
         controller.close()
 
+    def test_high_contrast_pulse_and_global_brightness_limit(self):
+        self.assertAlmostEqual(1.0, gentle_pulse_factor(0))
+        self.assertAlmostEqual(0.02, gentle_pulse_factor(1.2))
+        self.assertAlmostEqual(1.0, gentle_pulse_factor(2.4))
+        strip = SimulatedPixels()
+        driver = LightController(False, 12, 0.10, driver=strip)
+        driver.update(["running"] + ["available"] * 7,
+                      pulse_slot=1, pulse_factor=0.02)
+        self.assertEqual([(5, 3, 0)] * 8, strip.colors[:8])
+        self.assertEqual([(0, 255, 0)] * 8, strip.colors[8:16])
+        driver.close()
+
     def test_25hz_pulse_is_continuous_and_fades_out(self):
         animator = PulseAnimator()
         slot, factor = animator.frame(5, 100.0)
@@ -136,7 +149,7 @@ class LedBridgeTests(unittest.TestCase):
         for index in range(1, 51):
             slot, factor = animator.frame(5, 100.0 + 0.04 * index)
             self.assertEqual(5, slot)
-            self.assertLess(abs(factor - previous), .03)
+            self.assertLess(abs(factor - previous), .055)
             previous = factor
         slot, factor = animator.frame(None, 102.0)
         self.assertEqual(5, slot)
