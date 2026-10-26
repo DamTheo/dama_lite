@@ -1,7 +1,7 @@
 """Contrôle LED hors GPIO, avec un faux bandeau de 64 LED."""
 import unittest
 
-from dama_lite.led_bridge import states_from_snapshot, selftest
+from dama_lite.led_bridge import states_from_snapshot, selftest, should_hold_previous
 from dama_lite.lights import LightController
 
 
@@ -48,6 +48,12 @@ class LedBridgeTests(unittest.TestCase):
              "fault", "available", "fault", "available"],
             states_from_snapshot(data),
         )
+
+    def test_short_http_timeout_does_not_flicker_but_long_loss_goes_off(self):
+        self.assertFalse(should_hold_previous(None, 10.0))
+        self.assertTrue(should_hold_previous(100.0, 102.99))
+        self.assertFalse(should_hold_previous(100.0, 103.0))
+        self.assertFalse(should_hold_previous(100.0, 104.5))
 
     def test_leds_off_if_status_incomplete(self):
         self.assertEqual(["off"] * 8, states_from_snapshot({"power": "on"}))

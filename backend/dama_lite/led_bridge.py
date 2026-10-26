@@ -58,17 +58,39 @@ def states_from_snapshot(data: dict) -> list[str]:
     return result
 
 
+def should_hold_previous(
+    last_valid_at: float | None, now: float, grace_seconds: float = 3.0
+) -> bool:
+    """Évite le clignotement en cas de timeout HTTP isolé.
+
+    Au-delà de 3 s sans état valide, les LED reviennent à OFF.
+    Un blackout photo reçu correctement est appliqué immédiatement.
+    """
+    return last_valid_at is not None and now - last_valid_at < grace_seconds
+
+
 def run_polling(controller: LightController, stopped: threading.Event) -> None:
     last_states = None
-    while not stopped.wait(0.2):
+    last_valid_at: float | None = None
+    unreachable = False
+    while not stopped.wait(0.4):
         try:
-            with urlopen(STATUS_URL, timeout=0.7) as reply:
+            with urlopen(STATUS_URL, timeout=1.5) as reply:
                 snapshot = json.load(reply)
             statuses = (
                 ["off"] * 8 if snapshot.get("led_blackout")
                 else states_from_snapshot(snapshot)
             )
+            last_valid_at = time.monotonic()
+            if unreachable:
+                LOG.info("Connexion locale au contrôleur rétablie.")
+            unreachable = False
         except (URLError, OSError, ValueError, TypeError, TimeoutError):
+            if should_hold_previous(last_valid_at, time.monotonic()):
+                continue
+            if not unreachable:
+                LOG.warning("Statut local indisponible depuis 3 s : LED éteintes.")
+                unreachable = True
             statuses = ["off"] * 8
         if statuses != last_states:
             controller.update(statuses)

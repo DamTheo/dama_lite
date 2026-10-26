@@ -97,3 +97,19 @@ autorisé en écriture malgré \`ProtectSystem=strict\`.
 Le journal affiche le vecteur d'états de chaque groupe seulement
 à chaque changement, ce qui permet de contrôler les huit groupes sans
 saturer les logs. Le pilote ne touche jamais GPIO21.
+
+
+## Stabilisation de l'affichage LED (26/10/2026)
+
+Après le lancement du service sur l'appareil, le journal montrait des
+alternances \`available ×8\` et \`off ×8\` toutes les quelques secondes,
+alors qu'il n'y avait **aucun test en cours ni aucune photo programmée**.
+Ceci correspond à des lectures de l'API locale manquées au milieu de
+la charge USB (timeout de 0,7 s auparavant).
+
+Le service conserve désormais l'état connu pendant **3 secondes**
+maximum lorsqu'une seule requête de statut échoue, puis
+**éteint immédiatement tout le bandeau** si cette durée est dépassée.
+Les ordres de blackout photo correctement reçus ne bénéficient
+d'aucune temporisation et restent immédiats. La fréquence de lecture
+est réduite à 2,5 Hz pour limiter la charge du Pi.
