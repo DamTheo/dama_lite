@@ -147,8 +147,18 @@ svg { flex-shrink: 0; }
 .action.secondary { color: #c0c1c6; background: #131519; }
 .action.danger { background: #5a222b; border-color: #8c3c48; color: #ffccd0; }
 .new-screen { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 9px; padding-top: 10px; }
-.new-screen .tiles-grid { flex: 1 1 auto; min-height: 110px; max-height: 250px; }
+.setup-visualization { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1fr) 198px; gap: 10px; min-height: 0; }
+.new-screen .setup-visualization .tiles-grid { min-height: 0; max-height: none; }
 .new-screen .camera-tile { gap: 5px; }
+.setup-preview { background: #14161a; border: 1px solid #3e4147; border-radius: 11px; min-width: 0; min-height: 0; padding: 7px; display: flex; flex-direction: column; gap: 6px; }
+.setup-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 4px; font-size: 9px; }
+.setup-preview-heading strong { color: var(--yellow); font-size: 13px; }
+.setup-preview-heading span { color: var(--muted); letter-spacing: .06em; }
+.setup-preview-frame { position: relative; display: grid; place-items: center; flex: 1; min-height: 65px; overflow: hidden; background: #050505; border: 1px solid #33353a; border-radius: 7px; }
+.setup-preview-frame img { width: 100%; height: 100%; object-fit: contain; }
+.setup-preview-empty { color: #afb0b7; font-size: 10px; text-align: center; }
+.setup-preview-warning { position: absolute; bottom: 0; left: 0; right: 0; background: #502b2be5; padding: 4px; text-align: center; font-size: 10px; }
+.setup-preview small { color: #aeb1b8; line-height: 1.2; font-size: 10px; text-align: center; }
 .test-entry { display: grid; grid-template-columns: 1fr 210px; column-gap: 13px; row-gap: 3px; align-items: end; flex: 0 0 69px; }
 .test-entry label { grid-column: 1; color: #aaabb0; font-size: 10px; letter-spacing: .14em; font-weight: 700; }
 .test-entry input { grid-column: 1; background: #1b1d22; border: 1px solid #42444a; border-radius: 11px; width: 100%; height: 44px; padding: 0 13px; font-size: 17px; }
@@ -262,7 +272,10 @@ svg { flex-shrink: 0; }
   .action { min-height: 48px; }
   .menu-options { gap: 10px; }
   .new-screen { gap: 6px; padding-top: 7px; }
-  .new-screen .tiles-grid { max-height: 190px; }
+  .setup-visualization { grid-template-columns: minmax(0, 1fr) 188px; gap: 7px; }
+  .setup-preview { padding: 5px; gap: 3px; }
+  .setup-preview small { font-size: 9px; }
+  .new-screen .setup-visualization .tiles-grid { max-height: none; }
   .test-entry { flex-basis: 58px; }
   .hint-line { flex-basis: 17px; }
   .keyboard-overlay { padding-top: 4px; }
@@ -276,6 +289,9 @@ svg { flex-shrink: 0; }
   .face-card { min-height: 220px; }
   .home-stations { min-height: 290px; }
   .camera-screen { grid-template-columns: 1fr; overflow-y: auto; }
+  .setup-visualization { grid-template-columns: minmax(0,1fr) 150px; gap: 5px; }
+  .setup-preview-heading span { display: none; }
+  .setup-preview small { font-size: 9px; }
   .camera-info { flex-direction: row; flex-wrap: wrap; }
   .test-row { grid-template-columns: 60px 1fr 80px; }
   .test-row .stop-btn { grid-column: 3; }

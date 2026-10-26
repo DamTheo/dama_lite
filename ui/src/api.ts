@@ -17,6 +17,15 @@ export function getStatus(): Promise<MachineStatus> {
   return request<MachineStatus>("/api/status");
 }
 
+/** Sélection éphémère de la caméra pendant la préparation d'une analyse. */
+export function selectCameraForSetup(camera: number | null): Promise<{ selected: number | null }> {
+  return request("/api/selection", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ camera }),
+  });
+}
+
 export function startTest(camera: number, name: string): Promise<{ test: TestStatus }> {
   return request("/api/tests", {
     method: "POST",

@@ -3,7 +3,7 @@ import {
   AlertTriangle, ArrowLeft, Camera, Check, CircleOff, Cloud,
   CloudOff, Flame, Image, Play, Square, Thermometer, WifiOff,
 } from "lucide-react";
-import { acknowledgeCamera, getStatus, streamUrl, startTest, stopTest } from "./api";
+import { acknowledgeCamera, getStatus, selectCameraForSetup, streamUrl, startTest, stopTest } from "./api";
 import { Face, PowerOverlay } from "./Face";
 import TouchKeyboard from "./TouchKeyboard";
 import type { CameraStatus, MachineStatus, Screen, TestStatus } from "./types";
@@ -124,7 +124,7 @@ export default function App() {
       window.clearTimeout(frameTimer.current);
       frameTimer.current = null;
     }
-    if (screen === "camera") {
+    if (screen === "camera" || screen === "new") {
       setFrameError(false);
       
       setFrameTime(Date.now());
@@ -133,6 +133,21 @@ export default function App() {
       if (frameTimer.current !== null) window.clearTimeout(frameTimer.current);
     };
   }, [screen, camera]);
+  useEffect(() => {
+    // Le clignotement des 8 LED sélectionnées s'arrête au changement de
+    // page ; s'il y a une coupure réseau, le Pi l'expire au bout de 4 s.
+    if (screen !== "new") {
+      void selectCameraForSetup(null).catch(() => undefined);
+      return;
+    }
+    const ping = () => {
+      void selectCameraForSetup(camera).catch(() => undefined);
+    };
+    ping();
+    const timer = window.setInterval(ping, 1500);
+    return () => window.clearInterval(timer);
+  }, [screen, camera]);
+
   useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(null), 5500);
@@ -143,6 +158,9 @@ export default function App() {
   const connectedCount = cameras.filter(cam => cam.connected).length;
   const configuredCount = cameras.filter(cam => cam.configured).length;
   const selected = cameras.find(c => c.slot === camera);
+  const currentCameraTest = (status?.tests ?? []).find(
+    t => t.state === "running" && t.camera_slot === camera,
+  );
   const running = (status?.tests ?? []).filter(t => t.state === "running");
   const history = (status?.tests ?? []).filter(t => t.state !== "running").slice(0, 12);
   const selectedReady = Boolean(
@@ -182,7 +200,7 @@ export default function App() {
     setWorking(true);
     try {
       await stopTest(test.id);
-      setNotice("Analyse arrêtée : " + test.name);
+      setNotice("Expérience terminée : " + test.name);
       setConfirmStop(null);
       await refresh();
     } catch (err) {
@@ -297,11 +315,31 @@ export default function App() {
             {screen === "new" && (
               <div className="new-screen">
                 <div className="section-caption"><span>CHOISIR UNE CAMÉRA</span><span>UNE CAMÉRA = UN TEST</span></div>
-                <div className="tiles-grid selection">
-                  {cameras.map(cam => (
-                    <CameraTile camera={cam} selected={camera === cam.slot} key={cam.slot}
-                      onClick={() => { setCamera(cam.slot); setKeyboard(false); }} />
-                  ))}
+                <div className="setup-visualization">
+                  <div className="tiles-grid selection">
+                    {cameras.map(cam => (
+                      <CameraTile camera={cam} selected={camera === cam.slot} key={cam.slot}
+                        onClick={() => { setCamera(cam.slot); setKeyboard(false); }} />
+                    ))}
+                  </div>
+                  <aside className="setup-preview" aria-label={"Aperçu de la caméra " + camera}>
+                    <div className="setup-preview-heading">
+                      <strong>CAM {camera}</strong><span>APERÇU DIRECT</span>
+                    </div>
+                    <div className="setup-preview-frame">
+                      {selected?.connected ? (
+                        <img src={streamUrl(camera, frameTime)} alt={"Position de la plaque, caméra " + camera}
+                          onLoad={() => setFrameError(false)}
+                          onError={() => {
+                            setFrameError(true);
+                            scheduleNextFrame(2000);
+                          }} />
+                      ) : <div className="setup-preview-empty">Caméra indisponible</div>}
+                      {frameError && selected?.connected &&
+                        <div className="setup-preview-warning">Reconnexion vidéo…</div>}
+                    </div>
+                    <small>Vérifier la position de la plaque avant de lancer.</small>
+                  </aside>
                 </div>
                 <div className="test-entry">
                   <label htmlFor="test-name">NOM OBLIGATOIRE = DOSSIER SHAREPOINT *</label>
@@ -371,9 +409,16 @@ export default function App() {
                       onClick={() => void clearCameraFault(camera)}>
                       <Check size={18} /> Acquitter le défaut
                     </button>}
-                  <button className="action primary" disabled={!selectedReady} onClick={() => setScreen("new")}>
-                    <Play size={18} /> Nouveau test
-                  </button>
+                  {currentCameraTest ? (
+                    <button className="action danger" disabled={working}
+                      onClick={() => setConfirmStop(currentCameraTest)}>
+                      <Square size={18} /> Terminer l'expérience
+                    </button>
+                  ) : (
+                    <button className="action primary" disabled={!selectedReady} onClick={() => setScreen("new")}>
+                      <Play size={18} /> Nouveau test
+                    </button>
+                  )}
                 </aside>
               </div>
             )}
@@ -390,7 +435,7 @@ export default function App() {
                       <small>{test.images_count} photo(s) · {test.pending_uploads} en attente SharePoint
                         {test.upload_errors > 0 ? " · ERREUR DE SYNCHRONISATION" : ""}</small></div>
                     <div className="test-next"><small>PROCHAINE PHOTO</small><strong>{formatTime(test.next_photo_seconds)}</strong></div>
-                    <button className="stop-btn" onClick={() => setConfirmStop(test)}><Square size={16} /> Arrêter</button>
+                    <button className="stop-btn" onClick={() => setConfirmStop(test)}><Square size={16} /> Terminer</button>
                   </div>
                 ))}
                 {history.length > 0 && <div className="history-panel">
@@ -424,10 +469,10 @@ export default function App() {
 
       {keyboard && screen === "new" && <TouchKeyboard value={name} onChange={setName} onDone={() => setKeyboard(false)} />}
       {confirmStop && <div className="modal-backdrop"><div className="confirm-card">
-        <AlertTriangle size={28} /><h2>Arrêter l'analyse ?</h2>
-        <p>{confirmStop.name} — caméra {confirmStop.camera_slot}. Les photos déjà acquises seront conservées et transférées.</p>
-        <button className="action danger" disabled={working} onClick={() => void stopCurrent(confirmStop)}>Confirmer l'arrêt</button>
-        <button className="action" onClick={() => setConfirmStop(null)}>Continuer l'analyse</button>
+        <AlertTriangle size={28} /><h2>Terminer l'expérience ?</h2>
+        <p>{confirmStop.name} — caméra {confirmStop.camera_slot}. Les nouvelles acquisitions s'arrêtent ; les photos déjà acquises seront conservées et transférées sur SharePoint.</p>
+        <button className="action danger" disabled={working} onClick={() => void stopCurrent(confirmStop)}>Confirmer la fin</button>
+        <button className="action" onClick={() => setConfirmStop(null)}>Poursuivre l'expérience</button>
       </div></div>}
       {notice && <div className="toast" role="status"><AlertTriangle size={17} />{notice}<button onClick={() => setNotice(null)} aria-label="Fermer"><Check size={17} /></button></div>}
       {bootVisible && !isShutting && <PowerOverlay mode="booting" />}
