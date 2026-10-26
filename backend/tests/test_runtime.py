@@ -156,6 +156,12 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(set(), self.manager._reserving_slots)
 
     def test_camera_health_independent_of_global_sensor_fault(self):
+        # Contrairement aux faux périphériques non configurés par défaut,
+        # les huit canaux disposent ici d'un port USB explicitement associé.
+        self.cam.specs = {
+            slot: replace(self.cam.specs[slot], device=f"/dev/v4l/test-{slot}")
+            for slot in range(1, 9)
+        }
         self.thermal.temp = 22
         self.thermal.fault = "SONDE_OU_RELAIS : CRC invalide"
         self.assertEqual(["available"] * 8, self.manager.camera_health_states())
