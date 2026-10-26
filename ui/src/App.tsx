@@ -93,6 +93,15 @@ export default function App() {
   const [frameTime, setFrameTime] = useState(Date.now());
   const [frameError, setFrameError] = useState(false);
   const frameTimer = useRef<number | null>(null);
+  const videoRetryCount = useRef(0);
+
+  function retryVideoAfterError() {
+    // Les hubs USB ne doivent pas subir une boucle d'ouvertures V4L2
+    // toutes les deux secondes s'ils viennent de se réinitialiser.
+    videoRetryCount.current = Math.min(videoRetryCount.current + 1, 5);
+    const delay = Math.min(12000, 1500 * 2 ** (videoRetryCount.current - 1));
+    scheduleNextFrame(delay);
+  }
 
   function scheduleNextFrame(delayMs: number) {
     if (frameTimer.current !== null) window.clearTimeout(frameTimer.current);
@@ -125,6 +134,7 @@ export default function App() {
       frameTimer.current = null;
     }
     if (screen === "camera" || screen === "new") {
+      videoRetryCount.current = 0;
       setFrameError(false);
       
       setFrameTime(Date.now());
@@ -328,11 +338,12 @@ export default function App() {
                     </div>
                     <div className="setup-preview-frame">
                       {selected?.connected ? (
-                        <img src={streamUrl(camera, frameTime)} alt={"Position de la plaque, caméra " + camera}
-                          onLoad={() => setFrameError(false)}
+                        <img key={camera} src={streamUrl(camera, frameTime)}
+                          loading="eager" alt={"Position de la plaque, caméra " + camera}
+                          onLoad={() => { videoRetryCount.current = 0; setFrameError(false); }}
                           onError={() => {
                             setFrameError(true);
-                            scheduleNextFrame(2000);
+                            retryVideoAfterError();
                           }} />
                       ) : <div className="setup-preview-empty">Caméra indisponible</div>}
                       {frameError && selected?.connected &&
@@ -382,11 +393,12 @@ export default function App() {
               <div className="camera-screen">
                 <div className="preview-frame">
                   {selected?.connected ? (
-                    <img src={streamUrl(camera, frameTime)} alt={"Flux direct de la caméra " + camera}
-                      onLoad={() => setFrameError(false)}
+                    <img key={camera} src={streamUrl(camera, frameTime)}
+                      loading="eager" alt={"Flux direct de la caméra " + camera}
+                      onLoad={() => { videoRetryCount.current = 0; setFrameError(false); }}
                       onError={() => {
                         setFrameError(true);
-                        scheduleNextFrame(2000);
+                        retryVideoAfterError();
                       }} />
                   ) : <div className="empty-preview"><CircleOff size={36} /> Caméra absente</div>}
                   {frameError && <div className="preview-error">Aperçu momentanément indisponible · nouvel essai automatique</div>}
@@ -400,6 +412,7 @@ export default function App() {
                       if (frameTimer.current !== null) window.clearTimeout(frameTimer.current);
                       frameTimer.current = null;
                       
+                      videoRetryCount.current = 0;
                       setFrameTime(Date.now());
                       setFrameError(false);
                     }}>Reconnecter</button>

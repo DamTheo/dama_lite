@@ -112,3 +112,12 @@ d'un hub qui se déconnecte du noyau Linux.
 Le banc d'essai logiciel doit être revalidé après déploiement, caméra
 par caméra puis sur plusieurs heures. Aucun lancement expérimental
 n'est nécessaire pour contrôler ces aperçus.
+
+
+L'écran tactile applique de plus un **backoff exponentiel**
+sur les erreurs réelles de capture MJPEG (1,5 s, 3 s, 6 s, 12 s
+maximum) plutôt que de rouvrir indéfiniment un hub qui vient de
+redémarrer. Une première image réussie remet le compteur à zéro ;
+le changement de caméra aussi. Les autres emplacements restent
+accessibles indépendamment, et le bouton « Reconnecter » permet une
+reprise manuelle immédiate.
