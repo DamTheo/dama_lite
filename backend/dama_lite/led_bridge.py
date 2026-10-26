@@ -72,6 +72,7 @@ def run_polling(controller: LightController, stopped: threading.Event) -> None:
             statuses = ["off"] * 8
         if statuses != last_states:
             controller.update(statuses)
+            LOG.info("LED GPIO12 (8 x 8, 10%%): %s", ",".join(statuses))
             last_states = statuses
 
 

@@ -8,7 +8,9 @@ ConditionPathExists=/etc/dama-lite/leds-qualified
 Type=simple
 User=root
 Group=root
-WorkingDirectory=/home/damocles/dama-lite-staging
+RuntimeDirectory=dama-lite-led
+RuntimeDirectoryMode=0700
+WorkingDirectory=/run/dama-lite-led
 Environment=PYTHONPATH=/home/damocles/dama-lite-staging/backend
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 -m dama_lite.led_bridge --run-service
@@ -19,6 +21,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
+ReadWritePaths=/run/dama-lite-led
 UMask=0077
 RestrictAddressFamilies=AF_INET AF_UNIX
 

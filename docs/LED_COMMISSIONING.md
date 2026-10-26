@@ -80,3 +80,20 @@ sudo systemctl enable --now dama-lite-led-bridge.service
 \`\`\`
 
 Le relais chauffage GPIO21 et \`dama-lite.service\` restent éteints/inactifs.
+
+
+## Correctif du 26 octobre 2026 — répertoire de notification lgpio
+
+Lors du premier démarrage réel du pont LED, \`pinctrl get 12\`
+a confirmé le mode \`PWM0_0\` et \`systemd\` a confirmé le service actif.
+Cependant, le driver a affiché un avertissement
+\`xCreatePipe: Can't set permissions ... Read-only file system\`
+car il essayait d'ouvrir son canal de notification dans
+le dossier Git protégé en lecture seule.
+
+L'unité utilise maintenant le répertoire d'exécution privé
+\`/run/dama-lite-led\` (créé par systemd avec les droits 0700),
+autorisé en écriture malgré \`ProtectSystem=strict\`.
+Le journal affiche le vecteur d'états de chaque groupe seulement
+à chaque changement, ce qui permet de contrôler les huit groupes sans
+saturer les logs. Le pilote ne touche jamais GPIO21.
