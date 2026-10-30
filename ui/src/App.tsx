@@ -35,6 +35,7 @@ const LABELS = {
 // consultable même si la température est inférieure à 35 °C.
 function cameraLabel(cam: CameraStatus): string {
   if (!cam.configured) return "Non configurée";
+  if (!cam.mapping_verified) return "À identifier";
   if (!cam.connected) return "Déconnectée";
   if (cam.health === "fault") return "Défaut caméra";
   if (cam.health === "running") return "En cours";
@@ -74,7 +75,7 @@ function CameraTile({
 
 function emptyCameras(): CameraStatus[] {
   return Array.from({ length: 8 }, (_, index) => ({
-    slot: index + 1, configured: false, connected: false,
+    slot: index + 1, configured: false, mapping_verified: false, connected: false,
     led: "off" as const, health: "off" as const, active_test: null,
   }));
 }
@@ -184,7 +185,8 @@ export default function App() {
   const running = (status?.tests ?? []).filter(t => t.state === "running");
   const history = (status?.tests ?? []).filter(t => t.state !== "running").slice(0, 12);
   const selectedReady = Boolean(
-    selected?.connected && selected.health === "available" &&
+    selected?.connected && selected.mapping_verified &&
+    selected.health === "available" &&
     status?.sharepoint_configured && status?.thermal.ready && online &&
     status?.power === "on",
   );
@@ -391,7 +393,9 @@ export default function App() {
                       {frameError && selected?.connected &&
                         <div className="setup-preview-warning">Reconnexion vidéo…</div>}
                     </div>
-                    <small>Vérifier la position de la plaque avant de lancer.</small>
+                    <small>{selected?.mapping_verified === false
+                      ? "Emplacement non confirmé : vérification requise."
+                      : "Vérifier la position de la plaque avant de lancer."}</small>
                   </aside>
                 </div>
                 <div className="test-entry">
@@ -408,6 +412,8 @@ export default function App() {
                 </div>
                 <div className="hint-line">
                   {name && folderNameError ? folderNameError
+                    : selected?.mapping_verified === false
+                      ? "Affectation CAM " + camera + " à identifier avant une analyse."
                     : status?.thermal.fault ? "Défaut thermique : lancement bloqué"
                     : !status?.thermal.ready ? "Nom possible dès maintenant ; lancement uniquement dès 35 °C."
                     : !folderNameError ? "DOSSIER : DAMA-Lite / " + name
@@ -449,6 +455,8 @@ export default function App() {
                 <aside className="camera-info">
                   <strong>CAM {camera}</strong>
                   <span className={"state-mark " + selected?.health}>{selected ? cameraLabel(selected) : "—"}</span>
+                  {selected?.mapping_verified === false &&
+                    <p>Numérotation physique à confirmer : analyse désactivée sur cet emplacement.</p>}
                   <p>Flux MJPEG continu sans réencodage. Photographies PNG haute résolution prioritaires.</p>
                   <button className="action" disabled={!selected?.connected}
                     onClick={() => {

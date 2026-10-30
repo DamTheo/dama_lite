@@ -14,6 +14,7 @@ export interface ThermalStatus {
 export interface CameraStatus {
   slot: number;
   configured: boolean;
+  mapping_verified: boolean;
   connected: boolean;
   led: LedState;
   health: LedState;

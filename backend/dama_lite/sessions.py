@@ -49,6 +49,10 @@ class SessionManager:
             raise CannotStart("Machine en cours d'extinction.")
         if not self.cameras.ready(slot):
             raise CannotStart(f"Caméra {slot} absente ou non configurée.")
+        if not self.cameras.specs[slot].mapping_verified:
+            raise CannotStart(
+                f"Emplacement CAM {slot} à confirmer physiquement avant une analyse."
+            )
         state = self.thermal.snapshot()
         if not state["ready"]:
             detail = state["fault"] or (

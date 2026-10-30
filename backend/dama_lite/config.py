@@ -21,10 +21,13 @@ class CameraSpec:
     width: int = 1280
     height: int = 720
     pixel_format: str = "MJPG"
+    mapping_verified: bool = True
 
     def __post_init__(self):
         if not 1 <= self.slot <= 8:
             raise ConfigError("La caméra doit correspondre à un emplacement 1–8.")
+        if type(self.mapping_verified) is not bool:
+            raise ConfigError("Confirmation du positionnement caméra invalide.")
         if self.device and not (
             self.device.startswith("/dev/v4l/by-path/")
             or self.device.startswith("/dev/v4l/by-id/")

@@ -124,6 +124,7 @@ class DamaLiteService:
             "thermal": thermo,
             "cameras": [
                 {"slot": i, "configured": bool(self.cameras.specs[i].device),
+                 "mapping_verified": self.cameras.specs[i].mapping_verified,
                  "connected": self.cameras.ready(i),
                  "led": states[i - 1], "health": health[i - 1],
                  "active_test": next(
