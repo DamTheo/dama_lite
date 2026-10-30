@@ -1,4 +1,4 @@
-"""Réaffectation USB CAM1–CAM4 sur les emplacements physiques indiqués.
+"""Réaffectation USB des huit caméras aux emplacements physiques indiqués.
 
 Préserve tous les autres paramètres (SharePoint Entra, chauffe OFF,
 GPIO12, CAM5–CAM8), et applique le plan uniquement au staging du Pi.
@@ -18,19 +18,21 @@ from pathlib import Path
 from .config import Config
 from .safe_staging import STAGING_CONFIG, validate_staging
 
-# USB observé sur Incub-resa le 26 octobre 2026 (hub Linux 1-1.2).
-# D'après le retour opérateur : ancien CAM2=physique 1,
-# ancien CAM1=physique 3, ancien CAM3=physique 4.
-# Le port 1.2.3, ancien CAM4 (HTTP 503), reste le seul candidat pour
-# CAM2 : il doit être confirmé visuellement APRÈS déblocage des flux.
+# Nouvelle observation opérateur datée du 30/10/2026, deux hubs fonctionnels.
 USB_PORT_FOR_LOGICAL_SLOT = {
-    1: "1.2.4",
-    2: "1.2.3",  # À CONFIRMER visuellement, ne pas l'affirmer comme validé.
-    3: "1.2.2",
-    4: "1.2.1",
+    # Opérateur 30/10 : anciens 1->5, 2->6, 3->7, 4->8,
+    # 5->4, 6->3, 7->1, 8->1 (ambigu, physique 2 non identifié).
+    1: "1.1.3",  # ancienne tuile 7, physique 1
+    2: "1.1.4",  # ancienne tuile 8, PROVISOIRE / non vérifié
+    3: "1.1.2",  # ancienne tuile 6, physique 3
+    4: "1.1.1",  # ancienne tuile 5, physique 4
+    5: "1.2.4",  # ancienne tuile 1, physique 5
+    6: "1.2.3",  # ancienne tuile 2, physique 6
+    7: "1.2.2",  # ancienne tuile 3, physique 7
+    8: "1.2.1",  # ancienne tuile 4, physique 8
 }
-PORT_RE = re.compile(r"-usb-0:(1\.2\.[1-4]):1\.0-video-index0$")
-
+UNVERIFIED_SLOTS = frozenset({2})
+PORT_RE = re.compile(r"-usb-0:(1\.[12]\.[1-4]):1\.0-video-index0$")
 
 def usb_port(device: str | None) -> str | None:
     if not isinstance(device, str):
@@ -50,24 +52,24 @@ def remap_staging(raw: dict) -> dict:
     if set(by_slot) != set(range(1, 9)):
         raise ValueError("Slots caméra invalides ou dupliqués.")
     port_devices = {}
-    for slot in range(1, 5):
+    for slot in range(1, 9):
         path = by_slot[slot].get("device")
         port = usb_port(path)
         if port is None or port in port_devices:
             raise ValueError(
-                "Chemins persistants des quatre webcams du premier hub invalides."
+                "Chemins USB persistants des huit caméras invalides."
             )
         port_devices[port] = path
     if set(port_devices) != set(USB_PORT_FOR_LOGICAL_SLOT.values()):
         raise ValueError("Topologie USB inattendue : aucun remappage automatique.")
     result = json.loads(json.dumps(raw))
     for item in result["cameras"]:
-        if 1 <= item["slot"] <= 4:
-            item["device"] = port_devices[USB_PORT_FOR_LOGICAL_SLOT[item["slot"]]]
+        item["device"] = port_devices[USB_PORT_FOR_LOGICAL_SLOT[item["slot"]]]
+        item["mapping_verified"] = item["slot"] not in UNVERIFIED_SLOTS
     all_devices = [x["device"] for x in result["cameras"] if x.get("device")]
     if len(set(all_devices)) != len(all_devices):
         raise ValueError("Le remappage créerait deux caméras sur un même port.")
-    # CAM5–CAM8 et secrets Entra laissés inchangés à l'octet logique près.
+    # Configuration Entra, thermique et GPIO laissée inchangée.
     return result
 
 
@@ -121,12 +123,13 @@ def main() -> None:
         return
     backup = apply_staging()
     if backup is None:
-        print("Les quatre emplacements étaient déjà correctement associés.")
+        print("Les huit emplacements sont deja correctement associes.")
     else:
         print("Affectation mise à jour ; sauvegarde conservée : " + str(backup))
-    print("CAM1=USB1.2.4, CAM3=USB1.2.2, CAM4=USB1.2.1.")
-    print("CAM2=USB1.2.3 : emplacement encore à confirmer visuellement.")
-    print("CAM5-CAM8, Entra, chauffe et LED inchanges.")
+    print("CAM1:1.1.3, CAM2:1.1.4 (PROVISOIRE), CAM3:1.1.2, CAM4:1.1.1.")
+    print("CAM5:1.2.4, CAM6:1.2.3, CAM7:1.2.2, CAM8:1.2.1.")
+    print("CAM2 : analyses bloquees tant que la position physique est non verifiee.")
+    print("Entra, SharePoint, chauffe et LED inchanges.")
 
 
 if __name__ == "__main__":

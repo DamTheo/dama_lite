@@ -1,57 +1,56 @@
-"""Vérification de l'affectation USB, sans caméra ni secret Graph réel."""
+"""Les huit chemins USB sont distincts et CAM2 reste non qualifiée."""
 import unittest
-from dama_lite.camera_remap import remap_staging, usb_port
+from dama_lite.camera_remap import (
+    remap_staging, usb_port, USB_PORT_FOR_LOGICAL_SLOT, UNVERIFIED_SLOTS,
+)
 
 
 def make_raw():
     prefix = "/dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:"
-    order = [2, 4, 1, 3]
-    cameras = [
-        {"slot": idx, "device": prefix + f"1.2.{port}:1.0-video-index0",
-         "width": 1280, "height": 720, "pixel_format": "MJPG"}
-        for idx, port in enumerate(order, 1)
-    ]
-    cameras.extend(
-        {"slot": idx, "device": prefix + f"1.1.{idx - 4}:1.0-video-index0"}
-        for idx in range(5, 9)
-    )
+    ports = ("1.2.4", "1.2.3", "1.2.2", "1.2.1",
+             "1.1.1", "1.1.2", "1.1.3", "1.1.4")
     return {
-        "cameras": cameras, "heating_enabled": False,
-        "leds_enabled": False, "allow_os_shutdown": True,
+        "cameras": [
+            {"slot": i, "device": prefix + port + ":1.0-video-index0"}
+            for i, port in enumerate(ports, 1)
+        ],
+        "heating_enabled": False,
+        "leds_enabled": False,
+        "allow_os_shutdown": True,
         "sharepoint": {"graph_env_path": "/etc/dama-lite/graph.env"},
     }
 
 
 class MappingTests(unittest.TestCase):
-    def test_old_slot_labels_to_unique_persistent_usb_paths(self):
+    def test_full_eight_port_bijective_mapping(self):
         original = make_raw()
         revised = remap_staging(original)
-        expected = ["1.2.4", "1.2.3", "1.2.2", "1.2.1"]
-        self.assertEqual(expected, [
-            usb_port(c["device"]) for c in revised["cameras"][:4]
-        ])
-        self.assertEqual(8, len({
-            c["device"] for c in revised["cameras"]
-        }))
-        self.assertEqual(original["cameras"][4:], revised["cameras"][4:])
+        expected = [USB_PORT_FOR_LOGICAL_SLOT[i] for i in range(1, 9)]
+        self.assertEqual(
+            expected, [usb_port(c["device"]) for c in revised["cameras"]]
+        )
+        self.assertEqual(8, len(set(c["device"] for c in revised["cameras"])))
+        self.assertEqual({2}, UNVERIFIED_SLOTS)
+        self.assertFalse(revised["cameras"][1]["mapping_verified"])
+        self.assertTrue(all(c["mapping_verified"]
+                            for c in revised["cameras"] if c["slot"] != 2))
         self.assertEqual(original["sharepoint"], revised["sharepoint"])
-        self.assertFalse(revised["heating_enabled"])
-        self.assertFalse(revised["leds_enabled"])
         self.assertEqual(original, make_raw())
         self.assertEqual(revised, remap_staging(revised))
 
-    def test_reject_duplicate_or_unexpected_hub(self):
-        value = make_raw()
-        value["cameras"][0]["device"] = value["cameras"][1]["device"]
+    def test_reject_duplicate_or_unexpected_port(self):
+        old = make_raw()
+        old["cameras"][7]["device"] = old["cameras"][6]["device"]
         with self.assertRaisesRegex(ValueError, "invalides"):
-            remap_staging(value)
-        value = make_raw()
-        value["cameras"][0]["device"] = value["cameras"][0]["device"].replace(
-            "1.2.2:", "1.1.2:")
+            remap_staging(old)
+        old = make_raw()
+        old["cameras"][7]["device"] = old["cameras"][7]["device"].replace(
+            "1.1.4", "1.3.4"
+        )
         with self.assertRaisesRegex(ValueError, "invalides"):
-            remap_staging(value)
+            remap_staging(old)
 
-    def test_usb_by_id_is_not_a_reliable_identity_for_uc60(self):
+    def test_by_id_is_not_unique(self):
         self.assertIsNone(usb_port(
             "/dev/v4l/by-id/usb-DSJ_UC60_Video_200901010001-video-index0"
         ))
