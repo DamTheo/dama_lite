@@ -579,7 +579,7 @@ export default function App() {
         {status?.heat_test?.active ? <>
           <p>Essai en cours. Régulation automatique autour de 37 °C,
             durée limitée à 10 minutes, arrêt automatique si l'enceinte atteint 38,5 °C.</p>
-          {status.heat_test.last_record &&
+          {status.heat_test.last_record?.sample_fresh &&
             <p>Dernière mesure de l'essai : {formatTemp(status.heat_test.last_record.temperature_c)}
               {" · commande relais : "}
               {status.heat_test.last_record.relay_command_on ? "MARCHE" : "ARRÊT"}</p>}

@@ -46,6 +46,7 @@ export interface HeatTestStatus {
   max_chamber_c: number;
   last_record: null | {
     file: string;
+    sample_fresh: boolean;
     elapsed_s: number;
     temperature_c: number;
     cpu_c: number;

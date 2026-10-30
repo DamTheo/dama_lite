@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+import time
 from unittest.mock import Mock, patch
 
 from dama_lite.config import Config
@@ -25,10 +26,24 @@ class CommissioningGuardTests(unittest.TestCase):
         marker = Mock()
         marker.is_symlink.return_value = False
         marker.is_file.return_value = True
-        marker.stat.return_value = Mock(st_uid=0, st_mode=0o100644)
+        marker.stat.return_value = Mock(
+            st_uid=0, st_mode=0o100644, st_mtime=time.time()
+        )
         marker.read_text.return_value = "OPERATOR_PRESENT_INDEPENDENT_CUTOFF_CONFIRMED"
         self.assertTrue(marker_valid(marker))
-        marker.stat.return_value = Mock(st_uid=0, st_mode=0o100666)
+        marker.stat.return_value = Mock(
+            st_uid=0, st_mode=0o100666, st_mtime=time.time()
+        )
+        self.assertFalse(marker_valid(marker))
+
+    def test_authorization_expires_after_fifteen_minutes(self):
+        marker = Mock()
+        marker.is_symlink.return_value = False
+        marker.is_file.return_value = True
+        marker.read_text.return_value = "OPERATOR_PRESENT_INDEPENDENT_CUTOFF_CONFIRMED"
+        marker.stat.return_value = Mock(
+            st_uid=0, st_mode=0o100644, st_mtime=time.time() - 16 * 60,
+        )
         self.assertFalse(marker_valid(marker))
 
     def test_no_marker_blocks_every_gpio_operation(self):

@@ -28,6 +28,9 @@ from .thermal import DS18B20, ThermalController, cpu_temperature
 LOG = logging.getLogger(__name__)
 AUTH = Path("/etc/dama-lite/heat-test-onsite-approved")
 TOKEN = "OPERATOR_PRESENT_INDEPENDENT_CUTOFF_CONFIRMED"
+# La présence opérateur ne peut pas être présumée indéfiniment après
+# l'installation d'un fichier. Réarmer pour chaque campagne d'essai.
+MAX_ARM_AGE_S = 15 * 60
 LOG_DIR = Path("/home/damocles/dama-lite-staging/heat-test-logs")
 MAX_RUNTIME = 600.0
 MAX_TEST_TEMPERATURE = 38.5
@@ -43,6 +46,7 @@ def marker_valid(marker: Path = AUTH) -> bool:
     return (
         meta.st_uid == 0
         and stat.S_IMODE(meta.st_mode) & 0o022 == 0
+        and 0 <= time.time() - meta.st_mtime <= MAX_ARM_AGE_S
         and marker.read_text(encoding="ascii").strip() == TOKEN
     )
 

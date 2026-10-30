@@ -62,3 +62,34 @@ artificiellement le marqueur permanent de qualification.
 **Ce test n'établit pas à lui seul la tenue de régulation 30 minutes.**
 Même si T atteint 37 °C en 600 s, il faut une seconde campagne qualifiée
 pour stabilité et contrôle d'un thermomètre indépendant.
+
+
+## Utilisation depuis l'écran tactile
+
+La zone « CHAUFFE OFF · TOUCHER » est désormais une commande :
+elle ouvre un écran d'essai limité et distinct du profil principal.
+Un essai permanent ne peut pas être activé depuis cet écran.
+
+L'appareil présente :
+- la température enceinte et CPU, les confirmations de présence et de
+  protection thermique indépendante ;
+- le bouton « Démarrer l'essai (10 min) » lorsqu'il est **armé par root** ;
+- le bouton « Arrêter la chauffe d'essai » à tout moment ;
+- un état de service distinct du badge de chauffe permanente.
+
+Après contrôle physique du relais (NO / LOW=OFF) et de la protection,
+l'opérateur habilité peut armer **temporairement** le banc local :
+
+    sudo install -o root -g root -m 644 \
+      /home/damocles/dama-lite-staging/deploy/heat-test-onsite-approved.txt \
+      /etc/dama-lite/heat-test-onsite-approved
+
+Cet armement devient automatiquement caduc après **15 minutes**.
+Il n'est pas réutilisable sans nouvelle vérification sur place.
+Un essai déjà démarré se poursuit au plus 10 minutes sous ses propres
+surveillances ; expirer le marqueur ne prolonge jamais un essai.
+
+Les commandes tactiles demandent uniquement START/STOP à la passerelle
+root préinstallée, qui ne possède aucun accès à des commandes arbitraires.
+La chauffe reste désactivée dans le service staging et toute analyse
+reste bloquée jusqu'à qualification distincte de la production.
