@@ -20,10 +20,10 @@ from .safe_staging import STAGING_CONFIG, validate_staging
 
 # Nouvelle observation opérateur datée du 30/10/2026, deux hubs fonctionnels.
 USB_PORT_FOR_LOGICAL_SLOT = {
-    # Opérateur 30/10 : anciens 1->5, 2->6, 3->7, 4->8,
-    # 5->4, 6->3, 7->1, 8->1 (ambigu, physique 2 non identifié).
-    1: "1.1.3",  # ancienne tuile 7, physique 1
-    2: "1.1.4",  # ancienne tuile 8, PROVISOIRE / non vérifié
+    # Retour opérateur : seules les caméras 1 et 2 étaient inversées.
+    # Tous les autres ports restent identiques à la version précédente.
+    1: "1.1.4",  # physique 1
+    2: "1.1.3",  # physique 2
     3: "1.1.2",  # ancienne tuile 6, physique 3
     4: "1.1.1",  # ancienne tuile 5, physique 4
     5: "1.2.4",  # ancienne tuile 1, physique 5
@@ -31,7 +31,7 @@ USB_PORT_FOR_LOGICAL_SLOT = {
     7: "1.2.2",  # ancienne tuile 3, physique 7
     8: "1.2.1",  # ancienne tuile 4, physique 8
 }
-UNVERIFIED_SLOTS = frozenset({2})
+UNVERIFIED_SLOTS = frozenset()
 PORT_RE = re.compile(r"-usb-0:(1\.[12]\.[1-4]):1\.0-video-index0$")
 
 def usb_port(device: str | None) -> str | None:
@@ -126,9 +126,9 @@ def main() -> None:
         print("Les huit emplacements sont deja correctement associes.")
     else:
         print("Affectation mise à jour ; sauvegarde conservée : " + str(backup))
-    print("CAM1:1.1.3, CAM2:1.1.4 (PROVISOIRE), CAM3:1.1.2, CAM4:1.1.1.")
+    print("CAM1:1.1.4, CAM2:1.1.3, CAM3:1.1.2, CAM4:1.1.1.")
     print("CAM5:1.2.4, CAM6:1.2.3, CAM7:1.2.2, CAM8:1.2.1.")
-    print("CAM2 : analyses bloquees tant que la position physique est non verifiee.")
+    print("CAM1 et CAM2 confirmees par retour operateur.")
     print("Entra, SharePoint, chauffe et LED inchanges.")
 
 

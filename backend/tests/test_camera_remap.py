@@ -1,4 +1,4 @@
-"""Les huit chemins USB sont distincts et CAM2 reste non qualifiée."""
+"""Les huit ports USB restent uniques ; CAM1/CAM2 ont ete permutees."""
 import unittest
 from dama_lite.camera_remap import (
     remap_staging, usb_port, USB_PORT_FOR_LOGICAL_SLOT, UNVERIFIED_SLOTS,
@@ -30,13 +30,31 @@ class MappingTests(unittest.TestCase):
             expected, [usb_port(c["device"]) for c in revised["cameras"]]
         )
         self.assertEqual(8, len(set(c["device"] for c in revised["cameras"])))
-        self.assertEqual({2}, UNVERIFIED_SLOTS)
-        self.assertFalse(revised["cameras"][1]["mapping_verified"])
-        self.assertTrue(all(c["mapping_verified"]
-                            for c in revised["cameras"] if c["slot"] != 2))
+        self.assertEqual(set(), set(UNVERIFIED_SLOTS))
+        self.assertTrue(all(c["mapping_verified"] for c in revised["cameras"]))
         self.assertEqual(original["sharepoint"], revised["sharepoint"])
         self.assertEqual(original, make_raw())
         self.assertEqual(revised, remap_staging(revised))
+
+    def test_swap_only_first_two_ports_from_previous_deployment(self):
+        existing = make_raw()
+        previous_ports = [
+            "1.1.3", "1.1.4", "1.1.2", "1.1.1",
+            "1.2.4", "1.2.3", "1.2.2", "1.2.1",
+        ]
+        head = existing["cameras"][0]["device"].split("1.2.4:")[0]
+        for cam, port in zip(existing["cameras"], previous_ports):
+            cam["device"] = head + port + ":1.0-video-index0"
+            cam["mapping_verified"] = cam["slot"] != 2
+        new = remap_staging(existing)
+        self.assertEqual("1.1.4", usb_port(new["cameras"][0]["device"]))
+        self.assertEqual("1.1.3", usb_port(new["cameras"][1]["device"]))
+        self.assertTrue(new["cameras"][0]["mapping_verified"])
+        self.assertTrue(new["cameras"][1]["mapping_verified"])
+        self.assertEqual(
+            [c["device"] for c in existing["cameras"][2:]],
+            [c["device"] for c in new["cameras"][2:]],
+        )
 
     def test_reject_duplicate_or_unexpected_port(self):
         old = make_raw()

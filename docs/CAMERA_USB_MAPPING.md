@@ -1,48 +1,34 @@
-# CAMÉRAS DAMA Lite — correction du 30 octobre 2026
+# DAMA Lite - correction des caméras 1 et 2 (30 octobre 2026)
 
-Huit caméras UC60 sont désormais présentes sur deux hubs USB,
-avec des chemins distincts /dev/v4l/by-path (pas by-id, numéros
-de série identiques).
+L'opérateur a constaté que, suite au remappage des huit caméras,
+seuls les retours vidéo **CAM1** et **CAM2** étaient encore inversés.
 
-La lecture directe des emplacements de l'ancienne interface par
-l'opérateur a donné :
+La correction échange uniquement les ports USB 1.1.3 et 1.1.4
+et confirme ces deux identités. Aucun câble n'a été déplacé.
 
-| Ancien bouton | Caméra physique observée |
+| Caméra logique | Chemin physique USB |
 |---|---|
-| 1 | 5 |
-| 2 | 6 |
-| 3 | 7 |
-| 4 | 8 |
-| 5 | 4 |
-| 6 | 3 |
-| 7 | 1 |
-| 8 | 1 (doublon, physique 2 non identifiée) |
+| CAM1 | 1.1.4 |
+| CAM2 | 1.1.3 |
+| CAM3 | 1.1.2 |
+| CAM4 | 1.1.1 |
+| CAM5 | 1.2.4 |
+| CAM6 | 1.2.3 |
+| CAM7 | 1.2.2 |
+| CAM8 | 1.2.1 |
 
-Nouvelle attribution demandée (emplacement = numéro physique) :
+Les huit chemins restent différents sous /dev/v4l/by-path.
+Les numéros /dev/videoX et les liens by-id ne sont pas employés,
+car ils ne sont pas fiables pour huit caméras UC60 identiques.
 
-| Nouvelle caméra | Ancienne vue | Port stable | Confiance |
-|---|---|---|---|
-| CAM1 | 7 | 1.1.3 | retour opérateur |
-| CAM2 | 8 | 1.1.4 | PROVISOIRE / À VÉRIFIER |
-| CAM3 | 6 | 1.1.2 | retour opérateur |
-| CAM4 | 5 | 1.1.1 | retour opérateur |
-| CAM5 | 1 | 1.2.4 | retour opérateur |
-| CAM6 | 2 | 1.2.3 | retour opérateur |
-| CAM7 | 3 | 1.2.2 | retour opérateur |
-| CAM8 | 4 | 1.2.1 | retour opérateur |
+La correction lève le marquage provisoire « À identifier » de CAM2 :
+l'opérateur a désormais identifié explicitement l'inversion des
+deux dernières sources physiques.
 
-La dernière ancienne vue 8 est supposée correspondre à l'emplacement 2
-par élimination, mais cette hypothèse n'est PAS une identification.
-Le module écrit mapping_verified=false pour CAM2. L'interface affiche
-« À identifier » et la création d'une analyse sur cette caméra est
-refusée côté serveur, même après qualification de la chauffe.
+Déploiement : script de remappage atomique conservant une sauvegarde
+du fichier config.staging.json. Aucun paramètre de chauffe, LED,
+SharePoint, permissions ou arrêt du Pi ne doit être modifié.
 
-Le remappage atomique dans config.staging.json conserve les paramètres
-Entra, SharePoint, chauffage GPIO21, bandeau LED GPIO12 et extinction.
-Une copie horodatée permet un retour arrière.
-
-Les 8 chemins USB sont indépendants. Une prise physique qui change de port
-USB change d'identité : vérifier les numéros après tout recâblage.
-
-Pour confirmer CAM2, regarder son retour et son groupe LED puis signaler
-explicitement le bon emplacement physique avant de retirer le verrou.
+Valider ensuite le retour vidéo des caméras 1 et 2 sur le tactile.
+La résistance chauffante reste désactivée tant que sa protection
+matérielle indépendante n'est pas qualifiée.
