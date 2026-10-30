@@ -16,6 +16,7 @@ import os
 import subprocess
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -75,6 +76,7 @@ def _last_record() -> dict[str, Any] | None:
         line = rows[-1]
         return {
             "file": latest.name,
+            "sample_fresh": time.time() - latest.stat().st_mtime < 8.0,
             "elapsed_s": float(line["elapsed_s"]),
             "temperature_c": float(line["temperature_c"]),
             "cpu_c": float(line["cpu_c"]),
@@ -89,21 +91,33 @@ class HeatTestPanel:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self._lock = threading.RLock()
+        self._last_check_at = 0.0
+        self._cached: dict | None = None
 
     def snapshot(self) -> dict:
-        props = _systemd_properties()
-        phase = props.get("ActiveState", "unknown")
-        return {
-            "gateway_ready": _path_ready(),
-            "operator_armed": marker_valid(),
-            "phase": phase,
-            "active": phase in {"active", "activating"},
-            "result": props.get("Result", "unknown"),
-            "request_pending": REQUEST.is_file(),
-            "max_duration_s": 600,
-            "max_chamber_c": 38.5,
-            "last_record": _last_record(),
-        }
+        # /api/status est également consulté par le bandeau LED ~3 fois/s.
+        # Limiter les interrogations à systemd à 1/s pour préserver le Pi4,
+        # surtout lorsque les huit flux USB sont connectés.
+        with self._lock:
+            now = time.monotonic()
+            if self._cached is not None and now - self._last_check_at < 1.0:
+                return dict(self._cached)
+            props = _systemd_properties()
+            phase = props.get("ActiveState", "unknown")
+            data = {
+                "gateway_ready": _path_ready(),
+                "operator_armed": marker_valid(),
+                "phase": phase,
+                "active": phase in {"active", "activating"},
+                "result": props.get("Result", "unknown"),
+                "request_pending": REQUEST.is_file(),
+                "max_duration_s": 600,
+                "max_chamber_c": 38.5,
+                "last_record": _last_record(),
+            }
+            self._cached = data
+            self._last_check_at = now
+            return dict(data)
 
     def _request(self, action: str) -> None:
         """Publication atomique, un nom de service systemd fixé côté root."""
@@ -122,6 +136,7 @@ class HeatTestPanel:
                     os.fsync(f.fileno())
                 os.chmod(tmp, 0o600)
                 os.replace(tmp, REQUEST)
+                self._cached = None
             finally:
                 Path(tmp).unlink(missing_ok=True)
 
