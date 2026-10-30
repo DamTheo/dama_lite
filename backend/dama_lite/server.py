@@ -197,6 +197,19 @@ def make_handler(service: DamaLiteService):
                     service.sessions.acknowledge_camera(int(acknowledge.group(1)))
                     self._json(200, {"ok": True})
                     return
+                if path == "/api/heat-test/start":
+                    if set(body) != {"operator_present", "cutoff_verified"}:
+                        raise ValueError("Confirmation du test thermique invalide.")
+                    result = service.start_heat_test(
+                        body["operator_present"], body["cutoff_verified"]
+                    )
+                    self._json(202, result)
+                    return
+                if path == "/api/heat-test/stop":
+                    if body:
+                        raise ValueError("L'arrêt thermique n'accepte aucun paramètre.")
+                    self._json(202, service.stop_heat_test())
+                    return
                 if path == "/api/shutdown":
                     if set(body) != {"confirm_active_tests"} or type(body["confirm_active_tests"]) is not bool:
                         raise ValueError("Confirmer explicitement l'arrêt des expériences.")

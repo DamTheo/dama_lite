@@ -9,6 +9,7 @@ import time
 
 from .cameras import CameraController
 from .config import Config
+from .heat_panel import HeatTestPanel
 from .lights import LightController
 from .sessions import SessionManager
 from .sharepoint import SharePointClient, UploadWorker
@@ -47,6 +48,7 @@ class DamaLiteService:
         self._ui_selected_slot: int | None = None
         self._ui_selected_until = 0.0
         self._shutdown_confirmation_required = False
+        self.heat_panel = HeatTestPanel(cfg)
 
     def start(self) -> None:
         # Aucun démarrage d'acquisition ou LED ne doit précéder le contrôleur.
@@ -88,6 +90,23 @@ class DamaLiteService:
                 return None
             return self._ui_selected_slot
 
+    def start_heat_test(
+        self, confirmed_present: bool, confirmed_cutoff: bool
+    ) -> dict:
+        with self._lock:
+            if self._closing:
+                raise ValueError("Incubateur en cours d'arrêt.")
+            return self.heat_panel.start(
+                confirmed_present=confirmed_present,
+                confirmed_cutoff=confirmed_cutoff,
+                machine_power=self.state,
+                running_tests=self.store.running(),
+            )
+
+    def stop_heat_test(self) -> dict:
+        # STOP reste accessible à tout moment sans demander d'autorisation.
+        return self.heat_panel.stop()
+
     def shutdown_available(self) -> bool:
         return bool(
             self.cfg.allow_os_shutdown
@@ -122,6 +141,7 @@ class DamaLiteService:
         return {
             "power": self.state,
             "thermal": thermo,
+            "heat_test": self.heat_panel.snapshot(),
             "cameras": [
                 {"slot": i, "configured": bool(self.cameras.specs[i].device),
                  "mapping_verified": self.cameras.specs[i].mapping_verified,
@@ -154,6 +174,11 @@ class DamaLiteService:
                 return {"status": "shutting", "ended_tests": 0}
             if not self.shutdown_available():
                 raise CannotStart("Extinction Linux non autorisée sur ce Pi.")
+            heat = self.heat_panel.snapshot()
+            if heat["active"] or heat["request_pending"]:
+                raise CannotStart(
+                    "Arrêter d'abord l'essai de chauffe supervisé avant l'extinction."
+                )
             active = self.store.running()
             if active and not confirmed_active_tests:
                 self._shutdown_confirmation_required = True
@@ -225,7 +250,13 @@ class DamaLiteService:
             self.state = "shutting"
             self._ui_selected_slot = None
             self._ui_selected_until = 0.0
-        # Relais coupé AVANT toute opération réseau ou de stockage.
+        # La chauffe supervisée possède son propre service systemd :
+        # exiger son arrêt avant toute extinction du contrôleur.
+        try:
+            if self.heat_panel.snapshot()["active"]:
+                self.heat_panel.stop()
+        except Exception:
+            LOG.exception("Arrêt du service d'essai thermique à vérifier.")
         self.thermal.stop()
         self.sessions.close()
         # Stopper les flux MJPEG persistants avant la fermeture du service.
