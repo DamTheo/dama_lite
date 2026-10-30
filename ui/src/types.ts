@@ -35,9 +35,29 @@ export interface TestStatus {
   next_photo_seconds: number | null;
   folder_url: string | null;
 }
+export interface HeatTestStatus {
+  gateway_ready: boolean;
+  operator_armed: boolean;
+  phase: string;
+  active: boolean;
+  result: string;
+  request_pending: boolean;
+  max_duration_s: number;
+  max_chamber_c: number;
+  last_record: null | {
+    file: string;
+    elapsed_s: number;
+    temperature_c: number;
+    cpu_c: number;
+    relay_command_on: boolean;
+    fault: string | null;
+  };
+}
+
 export interface MachineStatus {
   power: "starting" | "on" | "shutting" | "shutdown_failed" | "shutdown_disabled" | "off";
   thermal: ThermalStatus;
+  heat_test: HeatTestStatus;
   cameras: CameraStatus[];
   tests: TestStatus[];
   sharepoint_configured: boolean;

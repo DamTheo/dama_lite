@@ -3,7 +3,7 @@ import {
   AlertTriangle, ArrowLeft, Camera, Check, CircleOff, Cloud,
   CloudOff, Flame, Image, Play, Power, Square, Thermometer, WifiOff,
 } from "lucide-react";
-import { acknowledgeCamera, cancelShutdownConfirmation, getStatus, selectCameraForSetup, shutdownMachine, streamUrl, startTest, stopTest } from "./api";
+import { acknowledgeCamera, cancelShutdownConfirmation, getStatus, selectCameraForSetup, shutdownMachine, startSupervisedHeatTest, stopSupervisedHeatTest, streamUrl, startTest, stopTest } from "./api";
 import { Face, PowerOverlay } from "./Face";
 import TouchKeyboard from "./TouchKeyboard";
 import type { CameraStatus, MachineStatus, Screen, TestStatus } from "./types";
@@ -91,6 +91,9 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmStop, setConfirmStop] = useState<TestStatus | null>(null);
   const [confirmShutdown, setConfirmShutdown] = useState(false);
+  const [showHeatTest, setShowHeatTest] = useState(false);
+  const [heatPresent, setHeatPresent] = useState(false);
+  const [heatCutoff, setHeatCutoff] = useState(false);
   const [shuttingDown, setShuttingDown] = useState(false);
   const [bootVisible, setBootVisible] = useState(true);
   const [frameTime, setFrameTime] = useState(Date.now());
@@ -236,6 +239,34 @@ export default function App() {
     }
   }
 
+  async function beginSupervisedHeatTest() {
+    if (working || !heatPresent || !heatCutoff) return;
+    setWorking(true);
+    try {
+      await startSupervisedHeatTest();
+      setNotice("Essai demandé : surveiller l'enceinte et la coupure physique.");
+      await refresh();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Démarrage de chauffe refusé.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function endSupervisedHeatTest() {
+    if (working) return;
+    setWorking(true);
+    try {
+      await stopSupervisedHeatTest();
+      setNotice("Arrêt du test demandé : vérifier que la chauffe cesse.");
+      await refresh();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Échec demande d'arrêt : couper physiquement.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function powerOff() {
     if (working || shuttingDown) return;
     setWorking(true);
@@ -283,11 +314,17 @@ export default function App() {
             <span className="brand-sub">by DAMOCLES Dx</span></div>
         </div>
         <div className="machine-readings">
-          <div className={"reading " + (status?.thermal.ready ? "ok" : "warm")}>
+          <button type="button" className={"reading heat-button " +
+              (status?.heat_test?.active ? "heat-active" : status?.thermal.ready ? "ok" : "warm")}
+            aria-label="Ouvrir les commandes d'essai de chauffe"
+            onClick={() => { setHeatPresent(false); setHeatCutoff(false); setShowHeatTest(true); }}>
             <Thermometer size={17} />
             <strong>{formatTemp(status?.thermal.temperature_c ?? null)}</strong>
-            <span>{!status?.thermal.heating_enabled ? "CHAUFFE OFF" : status.thermal.heater_on ? "CHAUFFE" : status.thermal.ready ? "PRÊT" : "ATTENTE"}</span>
-          </div>
+            <span>{status?.heat_test?.active ? "ESSAI CHAUFFE" :
+              status?.heat_test?.request_pending ? "ESSAI EN ATTENTE" :
+              !status?.thermal.heating_enabled ? "CHAUFFE OFF · TOUCHER" :
+              status.thermal.heater_on ? "CHAUFFE" : status.thermal.ready ? "PRÊT" : "ATTENTE"}</span>
+          </button>
           <div className="reading counts"><Camera size={17} /><strong>{connectedCount}/8</strong><span>CAMÉRAS</span></div>
           <button className="power-button" type="button" aria-label="Éteindre le Raspberry Pi proprement"
             title={status?.shutdown_available ? "Éteindre DAMA Lite" : "Extinction OS non configurée"}
@@ -533,7 +570,56 @@ export default function App() {
       </footer>
 
       {keyboard && screen === "new" && <TouchKeyboard value={name} onChange={setName} onDone={() => setKeyboard(false)} />}
-      {confirmShutdown && <div className="modal-backdrop"><div className="confirm-card shutdown-card"
+      {showHeatTest && <div className="modal-backdrop"><div className="confirm-card heat-modal"
+        role="dialog" aria-modal="true" aria-label="Essai de chauffe supervisé">
+        <Flame size={27} />
+        <h2>Essai de chauffe · 37 °C</h2>
+        <p><strong>Enceinte : {formatTemp(status?.thermal.temperature_c ?? null)}</strong>
+          {" · CPU : "}{formatTemp(status?.thermal.cpu_temperature_c ?? null)}</p>
+        {status?.heat_test?.active ? <>
+          <p>Essai en cours. Régulation automatique autour de 37 °C,
+            durée limitée à 10 minutes, arrêt automatique si l'enceinte atteint 38,5 °C.</p>
+          {status.heat_test.last_record &&
+            <p>Dernière mesure de l'essai : {formatTemp(status.heat_test.last_record.temperature_c)}
+              {" · commande relais : "}
+              {status.heat_test.last_record.relay_command_on ? "MARCHE" : "ARRÊT"}</p>}
+        </> : <>
+          <p>Le voyant « CHAUFFE OFF » indiquait un état, pas une commande.
+            Ce bouton prépare un <strong>essai de dix minutes maximum</strong>,
+            différent de la chauffe permanente.</p>
+          {!status?.heat_test?.gateway_ready &&
+            <p className="heat-warning">Passerelle système indisponible : essai impossible.</p>}
+          {!status?.heat_test?.operator_armed &&
+            <p className="heat-warning">Essai non armé : l'autorisation locale sécurisée
+              doit être installée par l'opérateur depuis PC01 après vérification matérielle.</p>}
+          {status?.heat_test?.phase === "failed" &&
+            <p className="heat-warning">Le dernier essai a échoué : consulter les journaux avant de recommencer.</p>}
+          <label className="heat-consent">
+            <input type="checkbox" checked={heatPresent} onChange={event => setHeatPresent(event.target.checked)} />
+            Je suis présent devant l'incubateur avec accès à la coupure électrique.
+          </label>
+          <label className="heat-consent">
+            <input type="checkbox" checked={heatCutoff} onChange={event => setHeatCutoff(event.target.checked)} />
+            Le coupe-circuit indépendant et l'arrêt physique de la résistance ont été vérifiés.
+          </label>
+          <button className="action primary"
+            disabled={working || !online || !heatPresent || !heatCutoff ||
+              !status?.heat_test?.operator_armed || !status?.heat_test?.gateway_ready ||
+              Boolean(status?.heat_test?.request_pending) || running.length > 0}
+            onClick={() => void beginSupervisedHeatTest()}>
+            <Flame size={18} /> {working ? "Précontrôle…" : "Démarrer l'essai (10 min)"}
+          </button>
+        </>}
+        <button className="action danger" disabled={working || !status?.heat_test?.gateway_ready}
+          onClick={() => void endSupervisedHeatTest()}>
+          <Square size={17} /> Arrêter la chauffe d'essai
+        </button>
+        <button className="action" disabled={working}
+          onClick={() => { setHeatPresent(false); setHeatCutoff(false); setShowHeatTest(false); }}>
+          Fermer
+        </button>
+      </div></div>}
+      {confirmShutdown && !showHeatTest && <div className="modal-backdrop"><div className="confirm-card shutdown-card"
         role="dialog" aria-modal="true" aria-label="Confirmer l'extinction de DAMA Lite">
         <Power size={29} /><h2>Éteindre DAMA Lite ?</h2>
         {running.length > 0 ? (

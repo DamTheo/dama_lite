@@ -61,6 +61,24 @@ export function cancelShutdownConfirmation(): Promise<{ ok: boolean }> {
   });
 }
 
+/** Démarrage réel réservé à l'opérateur sur place, préqualification root obligatoire. */
+export function startSupervisedHeatTest(): Promise<{ status: string; action: string }> {
+  return request("/api/heat-test/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ operator_present: true, cutoff_verified: true }),
+  });
+}
+
+/** L'arrêt d'essai ne requiert jamais d'autorisation pour se déclencher. */
+export function stopSupervisedHeatTest(): Promise<{ status: string; action: string }> {
+  return request("/api/heat-test/stop", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+}
+
 export function streamUrl(slot: number, moment: number): string {
   return "/api/cameras/" + slot + "/stream?t=" + moment;
 }
