@@ -100,6 +100,16 @@ class ThermalTests(unittest.TestCase):
         self.assertFalse(control.snapshot()["ready"])
         control.stop()
 
+    def test_cpu_sensor_unavailable_latches_heater_off(self):
+        sensor, relay = Sensor(20.0), Relay()
+        ctrl = ThermalController(config(), sensor, relay, cpu_reader=lambda: None)
+        ctrl.tick()
+        self.assertEqual("SONDE_CPU_INDISPONIBLE", ctrl.snapshot()["fault"])
+        self.assertFalse(ctrl.snapshot()["heater_on"])
+        self.assertFalse(ctrl.snapshot()["ready"])
+        self.assertFalse(relay.active)
+        ctrl.stop()
+
     def test_cpu_warning(self):
         sensor, relay = Sensor(35.5), Relay()
         control = ThermalController(config(), sensor, relay, cpu_reader=lambda: 65.5)

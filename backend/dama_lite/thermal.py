@@ -141,6 +141,10 @@ class ThermalController:
                 cpu = None
             self._state.cpu_temperature_c = cpu
             self._state.cpu_warning = cpu is not None and cpu >= self.cfg.cpu_warning_c
+            # Si la télémétrie CPU disparaît, aucune chauffe ne doit
+            # rester autorisée : impossible de garantir le seuil d'arrêt.
+            if cpu is None and self.cfg.heating_enabled:
+                self._state.fault = "SONDE_CPU_INDISPONIBLE"
             try:
                 temp = self.sensor.read()
                 self._state.temperature_c = round(temp, 3)
