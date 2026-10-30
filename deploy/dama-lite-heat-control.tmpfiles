@@ -1,0 +1,2 @@
+# Le contrôleur tactile crée uniquement un fichier d'ordre transitoire.
+d /run/dama-lite-heat-control 0700 damocles damocles -

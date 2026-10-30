@@ -1,0 +1,9 @@
+[Unit]
+Description=DAMA Lite - requêtes tactiles d'essai thermique surveillé
+
+[Path]
+PathExists=/run/dama-lite-heat-control/request
+Unit=dama-lite-heat-control.service
+
+[Install]
+WantedBy=multi-user.target

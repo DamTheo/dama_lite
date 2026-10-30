@@ -1,0 +1,22 @@
+#!/bin/sh
+# Ce script est installé hors du dépôt avec propriétaire root, mode 0755.
+# Il n'exécute jamais une commande fournie par un utilisateur.
+set -eu
+request=/run/dama-lite-heat-control/request
+if [ ! -f "$request" ]; then
+    exit 0
+fi
+action=$(head -c 8 "$request")
+rm -f "$request"
+case "$action" in
+    START)
+        exec /usr/bin/systemctl start --no-block dama-lite-heat-test.service
+        ;;
+    STOP)
+        exec /usr/bin/systemctl stop --no-block dama-lite-heat-test.service
+        ;;
+    *)
+        echo "Action de chauffe refusée" >&2
+        exit 1
+        ;;
+esac
